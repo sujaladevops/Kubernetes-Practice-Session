@@ -1,0 +1,28 @@
+1.What is the difference between Docker and Kubernetes?
+Docker is a container platform, where as Kubernetes is a container orchestration environment that offers capabilities like 
+Auto healing, Auto Scaling, Clustering and Enterprise Level support like Load Balancing.
+
+
+2. What are the main components of Kubernetes Architecture?
+On a broad level, it can be divide kubernetes components into two parts.
+i. Control Plane
+   a. API Server:  This is the central point of communication for interacting with the cluster. 
+        Users and other components send requests to the API server to manage workloads and access cluster information.
+   b. Kube Scheduler: IThis component assigns pods to nodes in the cluster based on various factors like resource availability, pod requirements, and affinity/anti-affinity rules.
+   c. ETCD: This is a distributed key-value store that stores the current state of the cluster, including the desired state of applications, their running pods, and configuration data. 
+   d. Controller Manager: This runs multiple controllers, each responsible for managing specific aspects of the cluster, such as deployments, replicasets, and nodes.
+      C-CM: Cloud Controller Manager: This is for any of the Cloud(AKS, EKS)
+ii. Data Plane
+    a. Kubelet: This agent on each node communicates with the API server and ensures pods are running according to the desired state. 
+       It manages containers, downloads container images, and reports back to the control plane.
+    b. Container Runtime: This software actually runs the containers on the node. Popular options include Docker, containerd, and CRI-O.
+    c. Kube-proxy: responsible for maintaining network connectivity between services and pods within the cluster. It acts as a network proxy on each node, ensuring smooth communication between pods across different nodes and between services exposed outside the cluster.  
+
+3. What are the differenes between Docekr Swarm and Kubernetes?
+   Kubernetes is a standard and suited for large Organizations as it offers more scalability, networking capabilities like
+   policies and huge third party  ecosystem support.
+
+4. What is the difference between Docker container and Kubernetes Pod?
+   A pod in kubernetes is a runtime specification of a container in docker. A pod provides more declarative way of defining using
+   YAML files and we can run more than one container in a pod.
+
