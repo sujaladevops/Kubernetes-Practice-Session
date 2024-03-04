@@ -10,7 +10,7 @@ kubectl config use-context k8s
 kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets -n app-team1
 kubectl create sa cicd-token --namespace app-team1
 kubectl create clusterrolebinding deploy-b --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
-
+----------------------------------------------------------------------------------------------------------------------------
 2. Set the node named ek8s-node-0 as unavailable and reschedule all the pods running on it.
 kubectl config use-context ek8s
 k get nodes
@@ -25,7 +25,7 @@ k drain ek8s-node0 --ignore-daemonsets --delete-emptydir-data/k drain ek8s-node-
 k get nodes
 k get pods -o wide
 
-
+----------------------------------------------------------------------------------------------------------------------------
 3. Given an existing Kubernetes cluster running version 1.22.1, upgrade all of the Kubernetes control plane and node components on the master
 node only to version 1.22.2.
 Be sure to drain the master node before upgrading it and uncordon it after the upgrade.
@@ -56,7 +56,7 @@ k get nodes
 mk8s-master-0     Ready      Control-plane, master     v1.22.2
 mk8s-node-0       Ready      <none>                    v1.22.1
 
-
+----------------------------------------------------------------------------------------------------------------------------
 4.First, create a snapshot of the existing etcd instance running at https://127.0.0.1:2379, saving the snapshot to /var/lib/backup/etcd-snapshot.db.
 Next, restore an existing, previous snapshot located at /var/lib/backup/etcd-snapshot-previous.db.
 Ans:
@@ -66,16 +66,16 @@ ETCDC TL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
   snapshot save <backup-file-location>
 
 ETCDCTL_API=3 etcdctl --data-dir <data-dir-location> snapshot restore snapshot.db
-
+----------------------------------------------------------------------------------------------------------------------------
 5. Create a new NetworkPolicy named allow-port-from-namespace in the existing namespace fubar.
 Ensure that the new NetworkPolicy allows Pods in namespace internal to connect to port 9000 of Pods in namespace fubar.
 Further ensure that the new NetworkPolicy:
 ✑ does not allow access to Pods, which don't listen on port 9000
 ✑ does not allow access from Pods, which are not in namespace internal
+Ans:
+
 vim policy.yaml
-kubectl label ns my-app project=my-app
-k describe ns my-app
-k create -f policy.yaml
+
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -94,7 +94,8 @@ spec:
     - protocol: TCP
       port: 9000
 
-
+k create -f policy.yaml
+----------------------------------------------------------------------------------------------------------------------------
 6. Reconfigure the existing deployment front-end and add a port specification named http exposing port 80/tcp of the existing container nginx.
 Create a new service named front-end-svc exposing the container port http.
 Configure the new service to also expose the individual Pods via a NodePort on the nodes on which they are scheduled.
@@ -138,13 +139,13 @@ spec:
     port: 80
     targetPort: 80
   type: NodePort
-
+----------------------------------------------------------------------------------------------------------------------------
 7. Scale the deployment to 3 Pods.
 k get deployments
 k scale deployment_name --replicas=3
 k get deployments 
 k get pods
-
+----------------------------------------------------------------------------------------------------------------------------
 8. Schedule a pod as follows:
 ✑ Name: nginx-kusc00401
 ✑ Image: nginx
@@ -167,13 +168,15 @@ containers:
 nodeSelector:
 disk: ssd
 
+k apply -f 8.yaml
+----------------------------------------------------------------------------------------------------------------------------
 9. Check to see how many nodes are ready (not including nodes tainted NoSchedule) and write the number to /opt/KUSC00402/kusc00402.txt.
 To check how many are tainted:
 kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[?(@.type=="Ready")].status | grep -w True | wc -l > /opt/KUSC00402/kusc00402.txt
 k get nodes
 echo "2" > /opt/KUSC00402/kusc00402.txt (if the answer is 2)
 cat /opt/KUSC00402/kusc00402.txt
-
+----------------------------------------------------------------------------------------------------------------------------
 10. Schedule a Pod as follows:
 ✑ Name: kucc8
 ✑ App Containers: 2
@@ -195,7 +198,7 @@ spec:
     image: consul
 k apply -f 10.yaml
 k get nodes -o wide
-
+----------------------------------------------------------------------------------------------------------------------------
 11.Create a persistent volume with name app-data, of capacity 2Gi and access mode ReadOnlyMany. The type of volume is hostPath and its location
 is /srv/app- data.
 vi 11.yaml
@@ -214,6 +217,7 @@ spec:
 k apply -f 11.yaml
 k get pv 
 
+----------------------------------------------------------------------------------------------------------------------------
 12. Monitor the logs of pod foo and:
 ✑ Extract log lines corresponding to error 9le-not-found
 ✑ Write them to /opt/KUTR00101/foo
@@ -223,6 +227,7 @@ k logs foo
 k logs foo | grep "9le-not-found"
 k logs foo | grep "9le-not-found" > /opt/KUTR00101/foo
 
+----------------------------------------------------------------------------------------------------------------------------
 13. An existing Pod needs to be integrated into the Kubernetes built-in logging architecture (e.g. kubectl logs). Adding a streaming sidecar container
 is a good and common way to accomplish this requirement.
 Task -
@@ -259,9 +264,7 @@ spec:
 k create -g big-app.yaml
 k get pods
 
-
-
-
+----------------------------------------------------------------------------------------------------------------------------
 14. From the pod label name=overloaded-cpu, find pods running high CPU workloads and write the name of the pod consuming most CPU to the file
 /opt/
 KUTR00401/KUTR00401.txt (which already exists).
@@ -273,8 +276,7 @@ k top pods -l name=overloaded-cpu --sort-by=cpu
 echo "overloaded-cpu-98b9se" > /opt/KUTR00401/KUTR00401.txt
 cat /opt/KUTR00401/KUTR00401.txt
 
-
-
+----------------------------------------------------------------------------------------------------------------------------
 15. A Kubernetes worker node, named wk8s-node-0 is in state NotReady.
 Investigate why this is the case, and perform any appropriate steps to bring the node to a Ready state, ensuring that any changes are made
 permanent.
@@ -290,8 +292,7 @@ exit
 exit
 k get nodes
 
-
-
+----------------------------------------------------------------------------------------------------------------------------
 16. Create a new PersistentVolumeClaim:
 ✑ Name: pv-volume
 ✑ Class: csi-hostpath-sc
@@ -342,4 +343,29 @@ Update the storage value under resources.requests to 70Mi.
 OR
 kubectl patch pvc pv-volume --type merge -p="{\"spec\":{\"resources\":{\"requests\":{\"storage\": \"70Mi\"}}}}"
 
+----------------------------------------------------------------------------------------------------------------------------
+17.Create a new nginx Ingress resource as follows:
+✑ Name: pong
+✑ Namespace: ing-internal
+✑ Exposing service hello on path /hello using service port 5678
 
+Ans: apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pong
+  namespace: ing-internal
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /hello
+        pathType: Prefix
+        backend:
+          service:
+            name: hello
+            port:
+              number: 5678
+
+k apply -f 17-ingress.yaml
