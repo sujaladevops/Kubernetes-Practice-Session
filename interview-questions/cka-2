@@ -1,0 +1,457 @@
+Weightage: (12%)
+1. Given an existing Kubernetes cluster running version 1.26.0,
+upgrade the master node and worker ndoe to version 1.27.0. 
+Besure to drain the master and worker node before upgrading it uncordon it afger the upgrade.
+Ans:
+upgrade the cluster based on Debian(https://v1-27.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
+
+k get nodes
+NAME            STATUS        ROLES              AGE       VERSION
+controlplane    READY    control-plane      3h50m         v1.26.0
+node01          READY       <none>          3h50m         v1.26.0
+k drain controlplane --ignore-daemonsets
+k get nodes
+NAME            STATUS                         ROLES              AGE       VERSION
+controlplane    READY, schedulingDisabled    control-plane      3h50m         v1.26.0
+node01          READY                           <none>          3h50m         v1.26.0
+ssh controlplane
+sudo -i
+apt-mark unhold kubeadm
+apt-get upadte
+apt-get install kubeadm=1.27.0-00
+apt-mark hold kubeadm
+kubeadm upgrade apply v1.27.0
+apt-get install kubelet=1.27.0-00
+systemctlrestartkubelet
+exit (logout)
+exit (connection to controlplane closed)
+masternode@controlpnae: k get nodes
+k uncordon node01
+k get nodes
+
+-----------------------------------------------------------------------------------------
+Weightage: (12%)
+2. Create a Snapshot of ETCD and save it to /root/backup/etcd-backup-new.db  (12%)
+You can use the below certificates for takung the Snapshot
+CA certificate: /root/certificates/ca.crt 
+Client certificate: /root/certificates/server.crt 
+key: /root/certificates/server.key 
+restore an old snapshot located at /root/backup/etcd-backup-old.db to /var/lib/etcd-backup
+
+Ans: https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#snapshot-using-etcdctl-options
+
+vi /etc/kubernetes/manifest/etcd.yaml (will find the path for crt/key)
+ETCDC TL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/root/certificates/ca.crt --cert=/root/certificates/server.crt --key=/root/certificates/server.key \
+  snapshot save /root/backup/etcd-backup-new.db
+  You can find the certificates 
+
+  verify the snapshot:
+  ETCDCTL_API=3 etcdctl --write-out=table snapshot status etcd-backup-new.db
+
+Question is about old snapshot restore: https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster
+etcd-backup-new.db etcd-backup-old.db
+
+ETCDCTL_API=3 etcdctl --data-dir <data-dir-location> snapshot restore snapshot.db
+OR
+ETCDC TL_API=3 etcdctl --data-dir=var/lib/etcd-backup --endpoints=https://127.0.0.1:2379 \
+  --cacert=/root/certificates/ca.crt --cert=/root/certificates/server.crt --key=/root/certificates/server.key \
+  snapshot restore /root/backup/etcd-backup-old.db
+
+To verify the restore:
+k get pods
+k run web1 --image=nginx
+k get pods
+once you enter the above restore command, it will show where it is restored.
+cd /var/lib  --> etcd-backup
+it alo has etcd
+cd /etc/kubernters/manifests/
+vim etcd.yaml
+volumes:
+- hostPath:
+    path: /var/lib/etcd-backup
+    type: DirectoryOrCreate
+  name: etcd-data
+
+Kubelet creates new pods and will see restoration
+-------------------------------------------------------------------
+Weightage: 8%
+3. Please join node01 worker node to the cluster, and you have to deploy a pod in the node01, pod name should be web and image should be nginx.
+Ans: https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-token/#synopsis
+k get pods
+masternode(only master node is available)
+ssh controlplane
+kubeadm token create --print-join-command
+result --> kubeadm join 172.30.1.2:6443 --token vosoil.78ouiy37 --discovery-token-ca-cert-hash 
+sha256:b064532987654382394756438947568392475683920384756839237465
+ssh node01: 
+node01: $kubeadm join 172.30.1.2:6443 --token vosoil.78ouiy37 --discovery-token-ca-cert-hash 
+sha256:b064532987654382394756438947568392475683920384756839237465
+If errored out
+k get nodes
+ssh node01
+node01$ systemctl status kubelet (not active)
+systemctl start kubelet
+systemctl status kubelet (active)
+exit (exit from the node01)
+controlplane$ k get nodes
+controlplane$ k run web --image=nginx
+k get pods
+----------------------------------------------------------------------------------------------------------------------------------
+Weightage: (6%)
+
+4. Please deploy a pod on node01 as per the below specification 
+pod name: web-pod
+image: nginx
+container name: web
+Ans:
+k run web-pod --image=nginx --dry-run=client -o yaml > 4.yaml
+vi 4.yaml
+container name should be changed to web and k apply -f 4.yaml
+k get pods 
+node01 (Not Ready) Issue may be docker daemon, kubelet service, or anything
+systemctl status kubelet (inactive)
+systemctl start kubelet
+systemctl status kubelet (still inactive)
+ExecStart=/usr/bin/local/kubelet
+cd /usr/bin/local --> there's no local folder
+choose the path from (Drop-In: /etc/systemd/system/kubelet.service.d)
+edit the file and update it with the right folder (ExecStart=/usr/bin/kubelet)
+Once it is saved, start the kubelet
+systemctl daemon-reload
+systemctl start kubelet
+systemctl status kubelet (active)
+controlplane$ k delete -f 4.yaml (optional if we don't see the pod is not deployed on node01)
+k get pod -o wide 
+--> web-pod will be on node01
+----------------------------------------------------------------------------------------------------------------------------------
+Weightage: (8%)
+
+5. Mark the worker node named kworker as unscheduled and reschedule all the pods running on it.
+Ans:
+k get nodes
+kmaster   READY      control-plane
+kworker2  READY       <none>
+kworker    READY      <none>
+
+k get pods -o wide
+web-1234    kworker2
+web-123     kworker2
+web-12      kworker
+
+k cordon kworker
+k get nodes
+kmaster     READY                       control-plane
+kworker2    READY                         <none>
+kworker     READY,schedulingDisabled      <none>
+
+k get pods -o wide
+one is still on kworker, so run the below command from the below link
+https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/#use-kubectl-drain-to-remove-a-node-from-service
+kubectl drain --ignore-daemonsets kworker
+kubectl drain --ignore-daemonsets kworker --delete-emptydir-data (successfully drained the node)
+k get pods -o wide
+now, all the pods are scheduled to kworker2
+k get nodes (will get to see kworker)
+k get pods -o wide (here all the pods still remains on the kworker2)
+------------------------------------------------------------------------------------------------------------------------------
+6. Create a new persistentVolume named web-pv. It should have a capacity of 2Gi, accessMode ReadWriteOnce, hostpath /vol/data and no storageClassNa,e defined.
+Next create a new PersistentVolumeClaim in Namespace production named web-pvc. it should request 2Gi storage, accessMode ReadWriteOnce and should not define a storageClassName. The PVC should bound to the PV correctly.
+Finally create a new Deployment web-deploy in Namespace production which mounts that volume at /tmp/web-data. The pods of that deployment should be of image nginx:1.14.2
+
+Ans: 
+PV: https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
+PVC: https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolumeclaim
+Deployment: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+mounting the volume: https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-pod
+
+
+vim pv-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: web-pv
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/vol/data"
+
+k apply -f pv-volumen.yaml
+persistentvolume/web-pv created
+k get nodes
+k create ns production
+
+vi pv-claim.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-pvc
+  namespace: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+k apply -f pv-claim.yaml
+persistentvolumeclaim/web-pvc created
+k get pvc -n production
+
+Deployment:
+vi nginx-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deploy
+  namespace: production
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      volumes:
+        - name: task-pv-storage
+          persistentVolumeClaim:
+            claimName: web-pvc
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - mountPath: "/tmp/web-data"
+            name: task-pv-storage
+
+k apply -f nginx-deployment.yaml
+k get deploy -n production
+k get pvc -n production
+--> web-pvc Bound
+------------------------------------------------------------------------------------------------------
+7. Expose an existing pod called nginxpod, service name as nginxnodeportsvc, service shuold access through Nodeport.
+Nodeport = 30200
+Ans:
+k get svc 
+kubernetes  ClusterIP    10.96.0.1     443/TCP
+nginxsvc    ClusterIP    10.102.247.231  80/TCP
+
+k get pods
+nginxpod 1/1 running
+
+k expose pod nginxpod --name=nginxnodeportsvc --port=80 --type=Nodeport
+service/nginxnodeportsvc exposed
+
+k get svc
+kubernetes        ClusterIP    10.96.0.1        443/TCP
+nginxsvc          ClusterIP    10.102.247.231   80/TCP
+nginxnodeportsvc  NodePort     10.96.40.242     80:31249/TCP (random port is exposed and as per the question,only 30200 should be exposed)
+
+k edit svc nginxnodeportsvc 
+now, edit the nodeport shoukd be using 30200
+It will automatically exposed to that port.
+
+k get svc
+kubernetes        ClusterIP    10.96.0.1        443/TCP
+nginxsvc          ClusterIP    10.102.247.231   80/TCP
+nginxnodeportsvc  NodePort     10.96.40.242     80:30200/TCP 
+
+Now, Access the nodes through NodePort:
+k get nodes -o wide
+controlplane    172.30.1.2
+node01          172.30.2.2
+
+curl 172.30.2.2:30200 (verification is done)
+------------------------------------------------------------------------------------------------------
+8. Use namespace project-1 for the following. 
+Create a Daemonset named daemon-imp with image httpd:2.4-alpine and labels id=daemon-imp and uuid=1234a-5678b-9012c. 
+The pods it creates should request 20millicore cpu and 20mebibyte memory. 
+The pods of the Daemonset should run on all nodes, also controlplanes.
+Ans:
+Daemonset- https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/#writing-a-daemonset-spec
+
+k get nodes
+controlplane
+node01
+
+vi daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemon-imp
+  namespace: project1
+  labels:
+    id: daemon-imp
+    uuid=1234a-5678b-9012c
+spec:
+  selector:
+    matchLabels:
+      id: daemon-imp
+      uuid=1234a-5678b-9012c
+  template:
+    metadata:
+      labels:
+        id: daemon-imp
+        uuid=1234a-5678b-9012c
+    spec:
+      tolerations:
+      # these tolerations are to have the daemonset runnable on control plane nodes
+      # remove them if your control plane nodes should not run pods
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: daemon-imp
+        image: httpd:2.4-alpine
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+
+
+k get ns
+k create project-1
+k apply -f daemonset.yaml (create daemonset only after checking if the namespace is available)
+k get ds -n project-1
+k get pods -n project-1
+k get pods -n project-1 -o wide
+--------------------------------------------------------------------------------------------------------
+9. You have a kubernetes cluster and running pods in multiple namespaces, the security team has mandated that
+the db pods on Project-a namespace only accessible from the service pods that are running in Project-b namespace.
+Ans:
+
+k get ns
+project-a 
+project-b 
+project-c 
+
+k get pods -n project-a 
+db-34k5hj534hj245
+
+k get pods -n project-b 
+service-24353-2345
+web-423536h23543kh934
+
+k get pods -n project-c 
+application-5hkb35j59fj4
+
+k get pods -o wide -n project -a
+db-34k5hj534hj245   192.168.1.3 
+
+k -n project-b exec service-24353-2345 --ping 192.168.1.3 (has connectivity)
+k -n project-b exec web-423536h23543kh934 --ping 192.168.1.3 (has connectivity)
+k -n project-c exec application-5hkb35j59fj4 --ping 192.168.1.3 (has connectivity)
+
+k label namespce project-a namespace=project-a
+namespace/project-a labeled
+k label namespace project-b namespace=project-b
+namespace/project-b labeled
+
+k get pods -n project-a --show-labels
+db-34k5hj534hj245   app=db (LABEL)
+k get pods -n project-b --show-labels
+service-24353-2345 app=service
+application-5hkb35j59fj4 app=web
+
+
+networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: project-a
+spec:
+  podSelector:
+    matchLabels:
+      app: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          namespace: project-b
+      podSelector:
+        matchLabels:
+          app: service
+k apply -f networkpolicy.yaml
+k -n project-b exec service-24353-2345 --ping 192.168.1.3 (has connectivity)
+k -n project-b exec web-423536h23543kh934 --ping 192.168.1.3 (no connectivity)
+k -n project-c exec application-5hkb35j59fj4 --ping 192.168.1.3 (no connectivity)
+
+Just to learn:
+k delete -f networkpolicy.yaml
+in the file add  a block like below
+ - from:
+    - namespaceSelector:
+        matchLabels:
+          namespace: project-b
+    - podSelector:
+        matchLabels:
+          app: service
+k apply -f networkpolicy.yaml
+k -n project-b exec service-24353-2345 --ping 192.168.1.3 (has connectivity)
+k -n project-b exec web-423536h23543kh934 --ping 192.168.1.3 (has connectivity)
+k -n project-c exec application-5hkb35j59fj4 --ping 192.168.1.3 (no connectivity)
+
+--------------------------------------------------------------------------------------------------------
+
+10. Create a new Service Account gitops in Namespae project-1. Create a Role and RoleBinding, both named gitops-role and gitops-rolebinding as well.
+These should allow the new SA to only create Secrets and ConfigMaps in that Namespace.
+Ans:
+
+First check namespaces,
+k get ns
+project-1
+
+K create sa gitops -n project-1
+serviceaccount/gitops created
+
+k get sa -n project-1
+k create role -n project-1 gitops-role -h
+k create clusterrole foo --verb=get,list,watch --resource=pods,pods/status (from help/cheatsheet)
+
+k create clusterrole -n project-1 gitops-role --verb=create --resource=secrets,configmap
+k get role -n project-1
+k describe role -n project-1
+
+k create clusterrolebinding gitops-rolebinding -n project-1 -h 
+k create clusterrolebinding gitops-rolebinding -n project-1 --role=gitops-role --serviceaccount=project-1:gitops
+
+verify:
+k -n project-1 auth can-i create pod --as system:serviceaccount:project-1:gitops
+no
+k -n project-1 auth can-i create configmap --as system:serviceaccount:project-1:gitops
+yes
+k -n project-1 auth can-i create secrets --as system:serviceaccount:project-1:gitops
+yes
+k -n project-1 auth can-i create deployments --as system:serviceaccount:project-1:gitops
+no
+
+--------------------------------------------------------------------------------------------------------
+
+More questions can be expected from the below topics.
+Deployment
+Taint and tolerations
+HPA
+configmaps
+side car
+Event logs
+Ingress controller
+Init Container
+
