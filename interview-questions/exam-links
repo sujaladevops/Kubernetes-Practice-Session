@@ -1,0 +1,21 @@
+Go through: https://cloudchamp.notion.site/How-I-Passed-my-CKA-Exam-55fef633b454438aadc54a7261312ec9
+kubectl cheatsheet: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-strong-getting-started-strong-
+1. [ETCD Backup & Restore](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+2. [Cluster Upgrade](https://kubernetes.io/docs/tasks/administer-cluster/cluster-upgrade/)
+3. [Working with PV and PVC](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/)
+4. [Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+5. [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+6. [Jsonpath & Custom columns](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
+7. [Monitoring/Logging Pods and nodes](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/)
+8. VIM & Nano
+9. [Service Accounts, Role and Role Bindings](https://kubernetes.io/docs/reference/access-authn-authz/authorization/)
+
+alias k=kubectl
+complete -o default -F __start_kubectl k
+export dr = ‘--dry-run=client -o yaml’
+>>k run pod --image=nginx $dr
+Export now=’--grace-period=o --force’
+>>k run pod --image=nginx --sleep 1d  creates the Pod
+>> k delete po pod $now  forcefully deletes the pod
+
+

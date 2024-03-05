@@ -1,3 +1,16 @@
+Top Questions in CKA Exam
+1. Cluster Upgrade to a specific version -- weightage up to 12%
+2. ETCD Backup and Restore   --- Weightage up to 12%
+3. Join a Node to the cluster --weightage up to 8%
+4. Cluster Troubleshoot(kubelet) -- weightage up to 8%
+5. Reschedule pods to another ndoes -- weightage up to 8%
+6. PV and PVC -- weightage up to 6%
+7. Pod expose through NodePort -- weightage up to 6%
+8. Daemonset -- weightage up to 5%
+9. Network policy -- weightage up to 5%
+10. Roles and Role Binding -- weightage up to 5%
+-------------------------------------------------------------------------------------------------------------
+
 1.What is the difference between Docker and Kubernetes?
 Docker is a container platform, where as Kubernetes is a container orchestration environment that offers capabilities like 
 Auto healing, Auto Scaling, Clustering and Enterprise Level support like Load Balancing.
