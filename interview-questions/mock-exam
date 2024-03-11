@@ -588,7 +588,9 @@ There is some issue on the student-node preventing it from accessing the cluster
 Troubleshoot and fix this issue. Make sure that you are able to run the kubectl commands (For example: kubectl get node --context=cluster4) from the student-node.
 The kubeconfig for all the clusters is stored in the default kubeconfig file: /root/.kube/config on the student-node.
 Ans:
-
+vim /root/.kube/config
+update the port from 64433 to 6443 under cluster4
+kubectl get node --context=cluster4
 -------------------------------------------------------------------------------------------------------
 Q: kubectl config use-context cluster2
 The yello-cka20-trb pod is stuck in a Pending state. Fix this issue and get it to a running state. Recreate the pod if necessary.
@@ -690,7 +692,7 @@ cluster3-controlplane node has enough resources to deploy more application pods.
 Ans:
 kubectl config use-context cluster3
 Now, get the details of the nodes: -
-kubectl get nodes -owide
+kubectl get nodes -o wide
 then SSH to the given node by the following command: -
 ssh cluster3-controlplane
 And run the kubectl scale command as follows: -
@@ -857,7 +859,7 @@ kubectl top pods -A --context cluster4 --no-headers | sort -nr -k3 | head -1
 kube-system   kube-apiserver-cluster4-controlplane            43m   266Mi   
 
 echo cluster3,default,backend-cka06-arch > /opt/high_memory_pod
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: Find the pod that consumes the most CPU and store the result to the file /opt/high_cpu_pod in the following format cluster_name,namespace,pod_name.
 The pod could be in any namespace in any of the clusters that are currently configured on the student-node.
 NOTE: It's recommended to wait for a few minutes to allow deployed objects to become fully operational and start consuming resources.
@@ -869,7 +871,7 @@ student-node ~ ➜  kubectl top pods -A --context cluster4 --no-headers | sort -
 Using this, find the pod that uses most CPU. In this case, it is kube-apiserver-cluster1-controlplane on cluster1.
 Save the result in the correct format to the file:
 student-node ~ ➜  echo cluster1,kube-system,kube-apiserver-cluster1-controlplane > /opt/high_cpu_pod
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: Find the node across all clusters that consumes the most memory and store the result to the file /opt/high_memory_node in the following format cluster_name,node_name
 Ans:
 kubectl top node --context cluster1 --no-headers | sort -nr -k2 | head -1
@@ -877,7 +879,7 @@ kubectl top node --context cluster2 --no-headers | sort -nr -k2 | head -1
 kubectl top node --context cluster3 --no-headers | sort -nr -k2 | head -1
 kubectl top node --context cluster4 --no-headers | sort -nr -k2 | head -1
 echo cluster3,cluster3-controlplane > /opt/high_memory_node
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: There is a deployment called nodeapp-dp-cka08-trb created in the default namespace on cluster1. 
 This app is using an ingress resource named nodeapp-ing-cka08-trb.
 From cluster1-controlplane host we should be able to access this app using 
@@ -910,7 +912,7 @@ status:
   loadBalancer:
     ingress:
     - ip: 192.32.19.17
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: There is a pod called pink-pod-cka16-trb created in the default namespace in cluster4. 
 This app runs on port tcp/5000 and it is exposed to end-users using an ingress resource called pink-ing-cka16-trb 
 in such a way that it is supposed to be accessible using the command: curl http://kodekloud-pink.app on cluster4-controlplane host.
@@ -927,7 +929,7 @@ kubectl get deploy -n kube-system
 kubectl scale --replicas=2 deployment coredns -n kube-system
 curl kodekloud-pink.app
 
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q:The cat-cka22-trb pod is stuck in Pending state. Look into the issue to fix the same. 
 Make sure that the pod is in running state and its stable (i.e not restarting or crashing).
 Note: Do not make any changes to the pod (No changes to pod config but you may destory and re-create).
@@ -964,7 +966,7 @@ kubectl edit secret cat-cka22-trb
 Change requests storage hostname: a29kZWtsb3Vkdg== to hostname: a29kZWtsb3VkCg== (values may vary)
 POD should be good now.
 
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q:In the dev-wl07 namespace, one of the developers has performed a rolling update and upgraded the application to a newer version. 
 But somehow, application pods are not being created.
 To get back the working state, rollback the application to the previous version .
@@ -976,12 +978,13 @@ kubectl config use-context cluster1
 kubectl get pods -n dev-wl07
 kubectl rollout undo -n dev-wl07 deploy webapp-wl07
 kubectl describe deploy -n dev-wl07 webapp-wl07 | grep -i image
+>>Image:        kodekloud/webapp-color
 ssh cluster1-controlplane
 echo "kodekloud/webapp-color" > /root/rolling-back-record.txt
 kubectl scale deploy -n dev-wl07 webapp-wl07 --replicas=5
 kubectl get deploy -n dev-wl07
 
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: demo-pod-cka29-trb pod is stuck in aPending state, look into issue to fix the same, Make sure pod is in Running state and stable.
 Ans:
 kubectl get event --field-selector involvedObject.name=demo-pod-cka29-trb
@@ -994,11 +997,15 @@ Warning   VolumeMismatch   persistentvolumeclaim/demo-pvc-cka29-trb   Cannot bin
 Edit the PVC and PV
 kubectl get pvc demo-pvc-cka29-trb -o yaml > /tmp/pvc.yaml
 vi /tmp/pvc.yaml
+
+kubectl replace --force -f pvc.yaml
+OR
 kubectl delete pvc demo-pvc-cka29-trb
 kubectl apply -f /tmp/pvc.yaml 
+
 kubectl get pod demo-pod-cka29-trb
 
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
 Q: One of our applications runs on the cluster3-controlplane node. Due to the possibility of traffic increase, we want to scale the application pods to loadbalance the traffic and provide a smoother user experience.
 cluster3-controlplane node has enough resources to deploy more application pods. Scale the deployment called essports-wl02 to 5.
 Ans:
@@ -1006,7 +1013,13 @@ kubectl config use-context cluster3
 kubectl get nodes -owide
 ssh cluster3-controlplane
 k scale deploy essports-wl02 --replicas=5
--------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------
+Q:
+A persistent volume called papaya-pv-cka09-str is already created with a storage capacity of 150Mi. 
+It's using the papaya-stc-cka09-str storage class with the path /opt/papaya-stc-cka09-str.
+Also, a persistent volume claim named papaya-pvc-cka09-str has also been created on this cluster. 
+This PVC has requested 50Mi of storage from papaya-pv-cka09-str volume.
+Resize the PVC to 80Mi and make sure the PVC is in Bound state.
 Ans:
 Edit papaya-pv-cka09-str PV:
 
@@ -1033,4 +1046,458 @@ Create the PVC using template:
 
 kubectl apply -f /tmp/papaya-pvc-cka09-str.yaml
 
--------------------------------------------------------------------------------------------------------
+/tmp/papaya-pv-cka09-str.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolume","metadata":{"annotations":{},"name":"papaya-pv-cka09-str"},"spec":{"accessModes":["ReadWriteOnce"],"capacity":{"storage":"150Mi"},"local":{"path":"/opt/papaya-stc-cka09-str"},"nodeAffinity":{"required":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["cluster1-controlplane"]}]}]}},"persistentVolumeReclaimPolicy":"Retain","storageClassName":"papaya-stc-cka09-str"}}
+    pv.kubernetes.io/bound-by-controller: "yes"
+  creationTimestamp: "2024-03-11T21:39:28Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: papaya-pv-cka09-str
+  resourceVersion: "13387"
+  uid: f050d40d-5179-4d87-87b0-8d8670c96e1b
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
+  claimRef:
+    apiVersion: v1
+       kind: PersistentVolumeClaim
+    name: papaya-pvc-cka09-str
+    namespace: default
+    resourceVersion: "13385"
+  local:
+    path: /opt/papaya-stc-cka09-str
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cluster1-controlplane
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: papaya-stc-cka09-str
+  volumeMode: Filesystem
+status:
+  phase: Bound
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: A pod called color-app-cka13-arch has been created in the default namespace. This pod logs can be accessed using kubectl logs -f color-app-cka13-arch command from the student-node. 
+It is currently displaying Color is pink output. Update the pod definition file to make use of the environment variable with the value - green and recreate this pod.
+Ans: k get pod color-app-cka13-arch -o yaml > green.yaml
+k delete pod color-app-cka13-arch
+k logs -f color-app-cka13-arch
+>>color is green
+color is green
+
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: For this question, please set the context to cluster1 by running:
+kubectl config use-context cluster1
+There is an existing persistent volume called orange-pv-cka13-trb. A persistent volume claim called orange-pvc-cka13-trb is created to claim storage from orange-pv-cka13-trb.
+However, this PVC is stuck in a Pending state. As of now, there is no data in the volume.
+Troubleshoot and fix this issue, making sure that orange-pvc-cka13-trb PVC is in Bound state.
+Ans:
+Describe the PVC and determine the issue
+
+kubectl describe pvc orange-pvc-cka13-trb
+Note the message "requested PV is too small". We must adjust the PVC to fit
+
+Describe the PV and determine its properties. Note that PVC properties must be adjusted to match
+
+kubectl describe pv orange-pv-cka13-trb
+Adjust the PVC. Note that you cannot directly edit a PVC size to be smaller, so we have to replace it.
+
+kubectl get pvc orange-pvc-cka13-trb -o yaml  > pvc.yaml
+vi pvc.yaml
+Change the requested size to match the size of the PV. Save and exit vi, then replace the PVC with the edited manifest:
+
+kubectl replace --force -f pvc.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: The blue-dp-cka09-trb deployment is having 0 out of 1 pods running. Fix the issue to make sure that pod is up and running.
+Ans:
+k get pod
+NAME                               READY   STATUS                  RESTARTS      AGE
+backend-cka06-arch                 1/1     Running                 0             51m
+blue-dp-cka09-trb-cb7678c8-cftmx   0/1     Init:CrashLoopBackOff   3 (17s ago)   65s
+
+k logs blue-dp-cka09-trb-cb7678c8-cftmx -c init-container
+
+k edit deploy blue-dp-cka09-trb
+   initContainers:
+   - command:
+     - sh
+     - -c
+     - echo 'Welcome!'
+k get event --field-selector involvedObject.name=blue-dp-cka09-trb-cb7678c8-cftmx
+
+k edit deploy blue-dp-cka09-trb
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: For this question, please set the context to cluster1 by running:
+
+kubectl config use-context cluster1
+We want to deploy a python based application on the cluster using a template located at /root/olive-app-cka10-str.yaml on student-node. However, before you proceed we need to make some modifications to the YAML file as per details given below:
+
+The YAML should also contain a persistent volume claim with name olive-pvc-cka10-str to claim a 100Mi of storage from olive-pv-cka10-str PV.
+Update the deployment to add a sidecar container, which can use busybox image (you might need to add a sleep command for this container to keep it running.)
+Share the python-data volume with this container and mount the same at path /usr/src. Make sure this container only has read permissions on this volume.
+Finally, create a pod using this YAML and make sure the POD is in Running state.
+Missing from the question, but required to pass
+Create a nodeport service for this deployment with the following specification
+Node port: 32006
+Name: olive-svc-cka10-str
+Ans:
+Solution
+Examine what we have...
+
+cat /root/olive-app-cka10-str
+The PVC volume claim is already present. Look for the PVC
+
+kubectl get pvc
+It is not present, therefore it will have to be created first.
+
+kubectl get pv
+The PV exists. Note the ACCESS MODES and STORAGECLASS, which are required in the PVC manifest, along with the storage request given in the question.
+
+Prepare manfiest for the new PVC
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: olive-pvc-cka10-str
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: olive-stc-cka10-str
+Then create it. It will not bind yet until the pod is created.
+
+Adjust the pod as directed, and add the service to the end.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olive-app-cka10-str
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: olive-app-cka10-str
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - cluster1-node01
+      containers:
+      - name: busybox
+        image: busybox
+        command:        # <- Any variation of sleep command should work.
+        - bin/sh        # Needs to sleep long enough to get to end of test.
+        - -c
+        - sleep 10000
+        volumeMounts:
+        - mountPath: /usr/src
+          name: python-data
+          readOnly: true
+      - name: python
+        image: poroko/flask-demo-app
+        ports:
+        - containerPort: 5000
+        volumeMounts:
+        - name: python-data
+          mountPath: /usr/share/
+      volumes:
+      - name: python-data
+        persistentVolumeClaim:
+          claimName: olive-pvc-cka10-str
+  selector:
+    matchLabels:
+      app: olive-app-cka10-str
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: olive-svc-cka10-str
+  namespace: default
+spec:
+  ports:
+  - nodePort: 32006
+    port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: olive-app-cka10-str
+  type: NodePort
+Create the resources
+
+kubectl apply -f /root/olive-app-cka10-str
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: For this question, please set the context to cluster3 by running:
+kubectl config use-context cluster3
+A manifest file is available at the /root/app-wl03/ on the student-node node.
+There are some issues with the file; hence couldn't deploy a pod on the cluster3-controlplane node.
+After fixing the issues, deploy the pod, and it should be in a running state.
+NOTE: - Ensure that the existing limits are unchanged.
+Ans:
+kubectl config use-context cluster3
+cd /root/app-wl03/
+>> app-wl03.yaml
+k create -f app-wl03.yaml
+>> The Pod "app-wl03" is invalid: spec.containers[0].resources.requests: Invalid value: "1Gi": must be less than or equal to memory limit
+vi app-wl03.yaml
+resources:
+     requests:
+       memory: 100Mi
+     limits:
+       memory: 100Mi
+
+kubectl create -f app-wl03.yaml 
+pod/app-wl03 created
+ k get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+alpine-sleeper-cka15-arch   1/1     Running   0          110m
+app-wl03                    1/1     Running   0          13s
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: There is a persistent volume named apple-pv-cka04-str. Create a persistent volume claim named apple-pvc-cka04-str and request a 40Mi of storage from apple-pv-cka04-str PV.
+The access mode should be ReadWriteOnce and storage class should be manual.
+Ans:
+vi apple-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apple-pvc-cka04-str
+spec:
+  volumeName: apple-pv-cka04-str
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 40Mi
+
+k apply -f apple-pvc.yaml
+
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: For this question, please set the context to cluster3 by running:
+kubectl config use-context cluster3
+Create a deployment named hr-web-app-cka08-svcn using the image kodekloud/webapp-color with 2 replicas.
+Expose the hr-web-app-cka08-svcn as service hr-web-app-service-cka08-svcn application on port 30082 on the nodes of the cluster.
+The web application listens on port 8080.
+Ans:
+kubectl config use-context cluster3
+kubectl create deployment  hr-web-app-cka08-svcn --image=kodekloud/webapp-color --replicas=2
+kubectl expose deployment hr-web-app-cka08-svcn --type=NodePort --port=8080 --name=hr-web-app-service-cka08-svcn --dry-run=client -o yaml > hr-web-app-service-cka08-svcn.yaml
+
+Now, in generated service definition file add the nodePort field with the given port number under the ports section and create a service.
+hr-web-app-service-cka08-svcn.yaml
+nodePort: 30082
+--------------------------------------------------------------------------------------------------------------------------------------------
+Q: For this question, please set the context to cluster3 by running:
+kubectl config use-context cluster3
+
+Part I:
+Create a ClusterIP service .i.e. service-3421-svcn in the spectra-1267 ns which should expose the pods namely pod-23 and pod-21 
+with port set to 8080 and targetport to 80.
+
+Part II:
+Store the pod names and their ip addresses from the spectra-1267 ns at /root/pod_ips_cka05_svcn where the output is sorted by their IP's.
+
+Please ensure the format as shown below:
+POD_NAME        IP_ADDR
+pod-1           ip-1
+pod-3           ip-2
+pod-2           ip-3
+...
+
+Ans:
+kubectl config use-context cluster3
+The easiest way to route traffic to a specific pod is by the use of labels and selectors . List the pods along with their labels:
+student-node ~ ➜  kubectl get pods --show-labels -n spectra-1267
+NAME     READY   STATUS    RESTARTS   AGE     LABELS
+pod-12   1/1     Running   0          5m21s   env=dev,mode=standard,type=external
+pod-34   1/1     Running   0          5m20s   env=dev,mode=standard,type=internal
+pod-43   1/1     Running   0          5m20s   env=prod,mode=exam,type=internal
+pod-23   1/1     Running   0          5m21s   env=dev,mode=exam,type=external
+pod-32   1/1     Running   0          5m20s   env=prod,mode=standard,type=internal
+pod-21   1/1     Running   0          5m20s   env=prod,mode=exam,type=external
+Looks like there are a lot of pods created to confuse us. But we are only concerned with the labels of pod-23 and pod-21.
+As we can see both the required pods have labels mode=exam,type=external in common. Let's confirm that using kubectl too:
+student-node ~ ➜  kubectl get pod -l mode=exam,type=external -n spectra-1267                                    
+NAME     READY   STATUS    RESTARTS   AGE
+pod-23   1/1     Running   0          9m18s
+pod-21   1/1     Running   0          9m17s
+Nice!! Now as we have figured out the labels, we can proceed further with the creation of the service:
+kubectl create service clusterip service-3421-svcn -n spectra-1267 --tcp=8080:80 --dry-run=client -o yaml > service-3421-svcn.yaml
+Now modify the service definition with selectors as required before applying to k8s cluster:
+student-node ~ ➜  cat service-3421-svcn.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: service-3421-svcn
+  name: service-3421-svcn
+  namespace: spectra-1267
+spec:
+  ports:
+  - name: 8080-80
+    port: 8080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: service-3421-svcn  # delete 
+    mode: exam    # add
+    type: external  # add
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+Finally let's apply the service definition:
+kubectl apply -f service-3421-svcn.yaml
+service/service-3421 created
+
+k get ep service-3421-svcn -n spectra-1267
+NAME           ENDPOINTS                     AGE
+service-3421   10.42.0.15:80,10.42.0.17:80   52s
+To store all the pod name along with their IP's , we could use imperative command as shown below:
+
+kubectl get pods -n spectra-1267 -o=custom-columns='POD_NAME:metadata.name,IP_ADDR:status.podIP' --sort-by=.status.podIP
+POD_NAME   IP_ADDR
+pod-12     10.42.0.18
+pod-23     10.42.0.19
+pod-34     10.42.0.20
+pod-21     10.42.0.21
+...
+store the output to /root/pod_ips
+kubectl get pods -n spectra-1267 -o=custom-columns='POD_NAME:metadata.name,IP_ADDR:status.podIP' --sort-by=.status.podIP > /root/pod_ips_cka05_svcn
+------------------------------------------------------------------------------------------------------------------------------------------
+Q:
+kubectl config use-context cluster3
+Create a ReplicaSet with name checker-cka10-svcn in ns-12345-svcn namespace with image registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3.
+Make sure to specify the below specs as well:
+command sleep 3600
+replicas set to 2
+container name: dns-image
+Once the checker pods are up and running, store the output of the command nslookup kubernetes.default from any one of the checker pod into the file /root/dns-output-12345-cka10-svcn on student-node.
+Ans:
+kubectl config use-context cluster3
+Create the ReplicaSet as per the requirements:
+
+
+
+kubectl apply -f - << EOF
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: null
+  name: ns-12345-svcn
+spec: {}
+status: {}
+
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: checker-cka10-svcn
+  namespace: ns-12345-svcn
+  labels:
+    app: dns
+    tier: testing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      tier: testing
+  template:
+    metadata:
+      labels:
+        tier: testing
+    spec:
+      containers:
+      - name: dns-image
+        image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3
+        command:
+          - sleep
+          - "3600"
+EOF
+
+k get pods -n ns-12345-svcn 
+NAME                       READY   STATUS    RESTARTS   AGE
+checker-cka10-svcn-d2cd2   1/1     Running   0          12s
+checker-cka10-svcn-qj8rc   1/1     Running   0          12s
+
+POD_NAME=`k get pods -n ns-12345-svcn --no-headers | head -1 | awk '{print $1}'`
+
+kubectl exec -n ns-12345-svcn -i -t $POD_NAME -- nslookup kubernetes.default
+>> ;; connection timed out; no servers could be reached
+command terminated with exit code 1
+There seems to be a problem with the name resolution. Let's check if our coredns pods are up and if any service exists to reach them:
+k get pods -n kube-system | grep coredns
+k get svc -n kube-system 
+NAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   62m
+Everything looks okay here but the name resolution problem exists, let's see if the kube-dns service have any active endpoints:
+
+kubectl get ep -n kube-system kube-dns 
+NAME       ENDPOINTS   AGE
+kube-dns   <none>      63m
+
+Finally, we have our culprit.
+If we dig a little deeper, we will it is using wrong labels and selector:
+kubectl describe svc -n kube-system kube-dns 
+Name:              kube-dns
+Namespace:         kube-system
+....
+Selector:          k8s-app=core-dns
+Type:              ClusterIP
+
+kubectl get deploy -n kube-system --show-labels | grep coredns
+coredns   2/2     2            2           66m   k8s-app=kube-dns
+
+kubectl patch service -n kube-system kube-dns -p '{"spec":{"selector":{"k8s-app": "kube-dns"}}}'
+service/kube-dns patched
+
+kubectl get ep -n kube-system kube-dns 
+NAME       ENDPOINTS                                              AGE
+kube-dns   10.50.0.2:53,10.50.192.1:53,10.50.0.2:53 + 3 more...   69m
+
+NOTE: We can use any method to update kube-dns service. In our case, we have used kubectl patch command.
+
+Now let's store the correct output to /root/dns-output-12345-cka10-svcn:
+
+kubectl exec -n ns-12345-svcn -i -t $POD_NAME -- nslookup kubernetes.default
+Server:         10.96.0.10
+Address:        10.96.0.10#53
+
+Name:   kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+
+kubectl exec -n ns-12345-svcn -i -t $POD_NAME -- nslookup kubernetes.default > /root/dns-output-12345-cka10-svcn
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: 
+kubectl config use-context cluster3
+Create a loadbalancer service with name wear-service-cka09-svcn to expose the deployment webapp-wear-cka09-svcn application in app-space namespace.
+Ans:
+kubectl config use-context cluster3
+
+kubectl expose -n app-space deployment webapp-wear-cka09-svcn --type=LoadBalancer --name=wear-service-cka09-svcn --port=8080
+service/wear-service-cka09-svcn exposed
+
+k get svc -n app-space
+NAME                      TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+wear-service-cka09-svcn   LoadBalancer   10.43.68.233   172.25.0.14   8080:32109/TCP   14s
