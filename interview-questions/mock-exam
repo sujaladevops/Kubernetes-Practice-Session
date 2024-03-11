@@ -429,3 +429,608 @@ spelling mistakes: controller
 k get pods -n kube-system
 
 k get deployments
+------------------------------------------------------------------------------------------
+Q: ETCD Key Value store which is running as a pod in cluster1 . 
+Take the backup of it and store it on the cluster1-controlplane node at the path /opt/cluster1_backup.db.
+You can ssh to the controlplane node by running ssh root@cluster1-controlplane from the student-node.
+
+NOTE: - If the etcd utility tool is unavailable on the controlplane, install it first.
+Ans:
+
+ssh root@cluster1-controlplane
+cd /tmp
+export RELEASE=$(curl -s https://api.github.com/repos/etcd-io/etcd/releases/latest | grep tag_name | cut -d '"' -f 4)
+wget https://github.com/etcd-io/etcd/releases/download/v3.5.0/etcd-v3.5.0-linux-amd64.tar.gz
+tar xzvf etcd-v3.5.0-linux-amd64.tar.gz
+sudo mv etcd-v3.5.0-linux-amd64/etcdctl /usr/local/bin/
+ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/cluster1_backup.db
+
+------------------------------------------------------------------------------------------
+Q: Create a generic secret called secure-sec-cka12-arch in the secure-sys-cka12-arch namespace on the cluster3. 
+Use the key/value of color=darkblue to create the secret.
+Ans: kubectl create ns secure-sys-cka12-arch --context cluster3
+kubectl create secret generic secure-sec-cka12-arch --from-literal=color=darkblue -n secure-sys-cka12-arch --context cluster3
+
+------------------------------------------------------------------------------------------
+Q: Create a service account called deploy-cka20-arch. 
+Further create a cluster role called deploy-role-cka20-arch with permissions to get the deployments in cluster1.
+Finally create a cluster role binding called deploy-role-binding-cka20-arch to bind deploy-role-cka20-arch cluster role with deploy-cka20-arch service account.
+
+Ans:
+kubectl --context cluster1 create serviceaccount deploy-cka20-arch
+kubectl --context cluster1 create clusterrole deploy-role-cka20-arch --resource=deployments --verb=get
+kubectl --context cluster1 create clusterrolebinding deploy-role-binding-cka20-arch --clusterrole=deploy-role-cka20-arch --serviceaccount=default:deploy-cka20-arch
+
+verify:
+kubectl --context cluster1 auth can-i get deployments --as=system:serviceaccount:default:deploy-cka20-arch
+
+------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+
+One of the nginx based pod called cyan-pod-cka28-trb is running under cyan-ns-cka28-trb namespace and it is exposed within the cluster using cyan-svc-cka28-trb service.
+This is a restricted pod so a network policy called cyan-np-cka28-trb has been created in the same namespace to apply some restrictions on this pod.
+Two other pods called cyan-white-cka28-trb and cyan-black-cka28-trb are also running in the default namespace.
+The nginx based app running on the cyan-pod-cka28-trb pod is exposed internally on the default nginx port (80).
+Expectation: This app should only be accessible from the cyan-white-cka28-trb pod.
+Problem: This app is not accessible from anywhere.
+Troubleshoot this issue and fix the connectivity as per the requirement listed above.
+Note: You can exec into cyan-white-cka28-trb and cyan-black-cka28-trb pods and test connectivity using the curl utility.
+You may update the network policy, but make sure it is not deleted from the cyan-ns-cka28-trb namespace.
+
+Ans:
+Let's look into the network policy
+
+kubectl edit networkpolicy cyan-np-cka28-trb -n cyan-ns-cka28-trb
+Under spec: -> egress: you will notice there is not cidr: block has been added, 
+since there is no restrcitions on egress traffic so we can update it as below. 
+Further you will notice that the port used in the policy is 8080 but 
+the app is running on default port which is 80 so let's update this as well (under egress and ingress):
+
+Change port: 8080 to port: 80
+- ports:
+  - port: 80
+    protocol: TCP
+  to:
+  - ipBlock:
+      cidr: 0.0.0.0/0
+Now, lastly notice that there is no POD selector has been used in ingress section but this app is supposed 
+to be accessible from cyan-white-cka28-trb pod under default namespace. 
+So let's edit it to look like as below:
+
+ingress:
+- from:
+  - namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: default
+   podSelector:
+      matchLabels:
+        app: cyan-white-cka28-trb
+Now, let's try to access the app from cyan-white-pod-cka28-trb
+
+kubectl exec -it cyan-white-cka28-trb -- sh
+curl cyan-svc-cka28-trb.cyan-ns-cka28-trb.svc.cluster.local
+Also make sure its not accessible from the other pod(s)
+
+kubectl exec -it cyan-black-cka28-trb -- sh
+curl cyan-svc-cka28-trb.cyan-ns-cka28-trb.svc.cluster.local
+It should not work from this pod. So its looking good now.
+-------------------------------------------------------------------------------------------------------
+Q: There is a deployment called nodeapp-dp-cka08-trb created in the default namespace on cluster1. 
+This app is using an ingress resource named nodeapp-ing-cka08-trb.
+From cluster1-controlplane host we should be able to access this app using the command: curl http://kodekloud-ingress.app. 
+However, it is not working at the moment. Troubleshoot and fix the issue.
+Note: You should be able to ssh into the cluster1-controlplane using ssh cluster1-controlplane command.
+
+Ans:
+SSh into cluster1-controlplane
+ssh cluster1-controlplane
+Try to access the app using curl http://kodekloud-ingress.app command. You will see 404 Not Found error.
+
+Look into the ingress to make sure its configued properly.
+
+kubectl get ingress
+kubectl edit ingress nodeapp-ing-cka08-trb
+Under rules: -> host: change example.com to kodekloud-ingress.app
+Under backend: -> service: -> name: Change example-service to nodeapp-svc-cka08-trb
+Change port: -> number: from 80 to 3000
+You should be able to access the app using curl http://kodekloud-ingress.app command now.
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+The purple-app-cka27-trb pod is an nginx based app on the container port 80. This app is exposed within the cluster using a ClusterIP type service called purple-svc-cka27-trb.
+There is another pod called purple-curl-cka27-trb which continuously monitors the status of the app running within purple-app-cka27-trb pod by accessing the purple-svc-cka27-trb service using curl.
+Recently we started seeing some errors in the logs of the purple-curl-cka27-trb pod.
+Dig into the logs to identify the issue and make sure it is resolved.
+Note: You will not be able to access this app directly from the student-node but you can exec into the purple-app-cka27-trb pod to check.
+Ans:
+
+kubectl logs purple-curl-cka27-trb
+You will see some logs as below
+
+Not able to connect to the nginx app on http://purple-svc-cka27-trb
+Now to debug let's try to access this app from within the purple-app-cka27-trb pod
+
+kubectl exec -it purple-app-cka27-trb -- bash
+curl http://purple-svc-cka27-trb
+exit
+You will notice its stuck, so app is not reachable. Let's look into the service to see its configured correctly.
+
+kubectl edit svc purple-svc-cka27-trb
+Under ports: -> port: and targetPort: is set to 8080 but nginx default port is 80 so change 8080 to 80 and save the changes
+Let's check the logs now
+
+kubectl logs purple-curl-cka27-trb
+You will see Thank you for using nginx. in the output now.
+-------------------------------------------------------------------------------------------------------
+Q: There is a Cronjob called orange-cron-cka10-trb which is supposed to run every two minutes (i.e 13:02, 13:04, 13:06…14:02, 14:04…and so on). This cron targets the application running inside the orange-app-cka10-trb pod to make sure the app is accessible. 
+The application has been exposed internally as a ClusterIP service.
+However, this cron is not running as per the expected schedule and is not running as intended.
+Make the appropriate changes so that the cronjob runs as per the required schedule and it passes the accessibility checks every-time.
+Ans:
+kubectl get cronjob (Check the cron schedule)
+Make sure the schedule for orange-cron-cka10-trb crontjob is set to */2 * * * * if not then edit it.
+
+Also before that look for the issues why this cron is failing
+
+kubectl logs orange-cron-cka10-trb-xxxx
+You will see some error like
+
+curl: (6) Could not resolve host: orange-app-cka10-trb
+You will notice that the curl is trying to hit orange-app-cka10-trb directly but it is supposed to hit the relevant service which is orange-svc-cka10-trb so we need to fix the curl command.
+
+Edit the cronjob
+kubectl edit cronjob orange-cron-cka10-trb
+Change schedule * * * * * to */2 * * * *
+Change command curl orange-app-cka10-trb to curl orange-svc-cka10-trb
+Wait for 2 minutes to run again this cron and it should complete now.
+-------------------------------------------------------------------------------------------------------
+Q:kubectl config use-context cluster4
+There is some issue on the student-node preventing it from accessing the cluster4 Kubernetes Cluster.
+Troubleshoot and fix this issue. Make sure that you are able to run the kubectl commands (For example: kubectl get node --context=cluster4) from the student-node.
+The kubeconfig for all the clusters is stored in the default kubeconfig file: /root/.kube/config on the student-node.
+Ans:
+
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster2
+The yello-cka20-trb pod is stuck in a Pending state. Fix this issue and get it to a running state. Recreate the pod if necessary.
+Do not remove any of the existing taints that are set on the cluster nodes.
+Ans:
+kubectl get pod --context=cluster2
+So you will see that yello-cka20-trb pod is in Pending state. Let's check out the relevant events.
+
+kubectl get event --field-selector involvedObject.name=yello-cka20-trb --context=cluster2
+You will see some errors like:
+
+Warning   FailedScheduling   pod/yello-cka20-trb   0/2 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/master: }, 1 node(s) had untolerated taint {node: node01}. preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.
+Notice this error 1 node(s) had untolerated taint {node: node01} so we can see that one of nodes have taints applied. We don't want to remove the node taints and we are not going to re-create the POD so let's look into the POD config if its using any other toleration settings.
+
+kubectl get pod yello-cka20-trb --context=cluster2 -o yaml
+You will notice this in the output
+
+tolerations:
+  - effect: NoSchedule
+    key: node
+    operator: Equal
+    value: cluster2-node01
+Here notice that the value for key node is cluster2-node01 but the node has different value applied i.e node01 so let's update the taints values for the node as needed.
+
+kubectl --context=cluster2 taint nodes cluster2-node01 node=cluster2-node01:NoSchedule --overwrite=true
+Let's check the POD status again
+
+kubectl get pod --context=cluster2
+It should be in Running state now.
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+
+Create a new deployment called ocean-tv-wl09 in the default namespace using the image kodekloud/webapp-color:v1.
+Use the following specs for the deployment:
+1. Replica count should be 3.
+2. Set the Max Unavailable to 40% and Max Surge to 55%.
+3. Create the deployment and ensure all the pods are ready.
+4. After successful deployment, upgrade the deployment image to kodekloud/webapp-color:v2 and inspect the deployment rollout status.
+5. Check the rolling history of the deployment and on the student-node, save the current revision count number to the /opt/revision-count.txt file.
+6. Finally, perform a rollback and revert back the deployment image to the older version.
+Ans:
+kubectl config use-context cluster1
+
+Use the following template to create a deployment called ocean-tv-wl09: -
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ocean-tv-wl09
+  name: ocean-tv-wl09
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ocean-tv-wl09
+  strategy: 
+   type: RollingUpdate
+   rollingUpdate:
+     maxUnavailable: 40%
+     maxSurge: 55%
+  template:
+    metadata:
+      labels:
+        app: ocean-tv-wl09
+    spec:
+      containers:
+      - image: kodekloud/webapp-color:v1
+        name: webapp-color
+
+
+Now, create the deployment by using the kubectl create -f command in the default namespace: -
+
+kubectl create -f <FILE-NAME>.yaml
+After sometime, upgrade the deployment image to kodekloud/webapp-color:v2: -
+kubectl set image deploy ocean-tv-wl09 webapp-color=kodekloud/webapp-color:v2
+And check out the rollout history of the deployment ocean-tv-wl09: -
+
+kubectl rollout history deploy ocean-tv-wl09
+deployment.apps/ocean-tv-wl09 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+
+NOTE: - Revision count is 2. In your lab, it could be different.
+On the student-node, store the revision count to the given file: -
+echo "2" > /opt/revision-count.txt
+In final task, rollback the deployment image to an old version: -
+kubectl rollout undo deployment ocean-tv-wl09
+Verify the image name by using the following command: -
+kubectl describe deploy ocean-tv-wl09
+It should be kodekloud/webapp-color:v1 image.
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster3
+One of our applications runs on the cluster3-controlplane node. Due to the possibility of traffic increase, we want to scale the application pods to loadbalance the traffic and provide a smoother user experience.
+cluster3-controlplane node has enough resources to deploy more application pods. Scale the deployment called essports-wl02 to 5.
+Ans:
+kubectl config use-context cluster3
+Now, get the details of the nodes: -
+kubectl get nodes -owide
+then SSH to the given node by the following command: -
+ssh cluster3-controlplane
+And run the kubectl scale command as follows: -
+kubectl scale deploy essports-wl02 --replicas=5
+OR
+You can run the kubectl scale command from the student node as well: -
+kubectl scale deploy essports-wl02 --replicas=5
+Verify the scaled-up pods by kubectl get command: -
+kubectl get pods
+The number of pods should be 1 to 5.
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster3
+One of our Junior DevOps engineers have deployed a pod nginx-wl06 on the cluster3-controlplane node. However, while specifying the resource limits, instead of using Mebibyte as the unit, Gebibyte was used.
+As a result, the node doesn't have sufficient resources to deploy this pod and it is stuck in a pending state
+Fix the units and re-deploy the pod (Delete and recreate the pod if needed).
+Ans: 
+kubectl config use-context cluster3
+Run the following command to check the pending pods on all the namespaces: -
+kubectl get pods -A
+After that, inspect the pod Events as follows: -
+kubectl get pods -A | grep -i pending
+kubectl describe po nginx-wl06
+Make use of the kubectl edit command to update the values from Gi to Mi:-
+kubectl edit po nginx-wl06
+It will save the temporary file under the /tmp/ directory. Use the kubectl replace command as follows: -
+kubectl replace -f /tmp/kubectl-edit-xxxx.yaml --force
+It will delete the existing pod and will re-create it again with new changes.
+-------------------------------------------------------------------------------------------------------
+Q:kubectl config use-context cluster1
+Create a persistent volume called data-pv-cka02-str with the below properties:
+- Its capacity should be 128Mi.
+- The volume type should be hostpath and path should be /opt/data-pv-cka02-str.
+Next, create a persistent volume claim called data-pvc-cka02-str as per below properties:
+- Request 50Mi of storage from data-pv-cka02-str PV.
+Ans:
+Set context to cluster1:
+
+Create a yaml template as below:
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: data-pv-cka02-str
+spec:
+  capacity:
+    storage: 128Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /opt/data-pv-cka02-str
+  storageClassName: manual
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-pvc-cka02-str
+spec:
+  storageClassName: manual
+  volumeName: data-pv-cka02-str
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Mi
+Apply the template:
+kubectl apply -f <template-file-name>.yaml
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster3
+There is a deployment nginx-deployment-cka04-svcn in cluster3 which is exposed using service nginx-service-cka04-svcn.
+Create an ingress resource nginx-ingress-cka04-svcn to load balance the incoming traffic with the following specifications:
+pathType: Prefix and path: /
+Backend Service Name: nginx-service-cka04-svcn
+Backend Service Port: 80
+ssl-redirect is set to false
+Ans:
+First change the context to "cluster3":
+student-node ~ ➜  kubectl config use-context cluster3
+Switched to context "cluster3".
+Now apply the ingress resource with the given requirements:
+
+kubectl apply -f - << EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress-cka04-svcn
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service-cka04-svcn
+            port:
+              number: 80
+EOF
+
+
+Check if the ingress resource was successfully created:
+
+student-node ~ ➜  kubectl get ingress
+NAME                       CLASS    HOSTS   ADDRESS       PORTS   AGE
+nginx-ingress-cka04-svcn   <none>   *       172.25.0.10   80      13s
+
+As the ingress controller is exposed on cluster3-controlplane using traefik service, we need to ssh to cluster3-controlplane first to check if the ingress resource works properly:
+
+student-node ~ ➜  ssh cluster3-controlplane
+
+cluster3-controlplane:~# curl -I 172.25.0.11
+HTTP/1.1 200 OK
+...
+-------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster3
+
+Part I:
+Create a ClusterIP service .i.e. service-3421-svcn in the spectra-1267 ns which should expose the pods namely pod-23 and pod-21 with port set to 8080 and targetport to 80.
+
+Part II:
+Store the pod names and their ip addresses from the spectra-1267 ns at /root/pod_ips_cka05_svcn where the output is sorted by their IP's.
+
+Please ensure the format as shown below:
+POD_NAME        IP_ADDR
+pod-1           ip-1
+pod-3           ip-2
+pod-2           ip-3
+...
+-------------------------------------------------------------------------------------------------------
+Q: A template to create a Kubernetes pod is stored at /root/red-probe-cka12-trb.yaml on the student-node. However, using this template as-is is resulting in an error.
+Fix the issue with this template and use it to create the pod. Once created, watch the pod for a minute or two to make sure its stable i.e, it's not crashing or restarting.
+Make sure you do not update the args: section of the template.
+Ans:
+Erros shows after apply the template,
+error: error validating "red-probe-cka12-trb.yaml": error validating data: [ValidationError(Pod.spec.containers[0].livenessProbe.httpGet): unknown field "command" in io.k8s.api.core.v1.HTTPGetAction, ValidationError(Pod.spec.containers[0].livenessProbe.httpGet): missing required field "port" in io.k8s.api.core.v1.HTTPGetAction]; if you choose to ignore these errors, turn validation off with --validate=false
+Under livenessProbe: you will see the type is httpGet however the rest of the options are command based so this probe should be of exec type.
+Change httpGet to exec
+POD status(logs/events): kubectl get event --field-selector involvedObject.name=red-probe-cka12-trb
+Notice the command - sleep 3 ; touch /healthcheck; sleep 30;sleep 30000 it starts with a delay of 3 seconds, but the liveness probe initialDelaySeconds is set to 1 and failureThreshold is also 1. 
+Which means the POD will fail just after first attempt of liveness check which will happen just after 1 second of pod start. So to make it stable we must increase the initialDelaySeconds to at least 5
+Change initialDelaySeconds from 1 to 5 and save apply the changes.
+kubectl delete pod red-probe-cka12-trb
+kubectl apply -f red-probe-cka12-trb.yaml
+----------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+Q: There is a script located at /root/pod-cka26-arch.sh on the student-node. 
+Update this script to add a command to filter/display the label with value component of the pod called kube-apiserver-cluster1-controlplane (on cluster1) using jsonpath.
+Ans: 
+kubectl --context cluster1 get pod -n kube-system kube-apiserver-cluster1-controlplane -o jsonpath=‘{.metadata.labels.component}’
+-------------------------------------------------------------------------------------------------------
+Q: Find the pod that consumes the most memory and store the result to the file /opt/high_memory_pod in the following format cluster_name,namespace,pod_name.
+The pod could be in any namespace in any of the clusters that are currently configured on the student-node.
+NOTE: It's recommended to wait for a few minutes to allow deployed objects to become fully operational and start consuming resources.
+Ans:
+kubectl top pods -A --context cluster1 --no-headers | sort -nr -k3 | head -1
+kube-system       kube-apiserver-cluster1-controlplane            48m   262Mi   
+kubectl top pods -A --context cluster2 --no-headers | sort -nr -k3 | head -1
+kube-system   kube-apiserver-cluster2-controlplane            44m   258Mi   
+kubectl top pods -A --context cluster3 --no-headers | sort -nr -k3 | head -1
+default       backend-cka06-arch                        205m   596Mi   
+kubectl top pods -A --context cluster4 --no-headers | sort -nr -k3 | head -1
+kube-system   kube-apiserver-cluster4-controlplane            43m   266Mi   
+
+echo cluster3,default,backend-cka06-arch > /opt/high_memory_pod
+-------------------------------------------------------------------------------------------------------
+Q: Find the pod that consumes the most CPU and store the result to the file /opt/high_cpu_pod in the following format cluster_name,namespace,pod_name.
+The pod could be in any namespace in any of the clusters that are currently configured on the student-node.
+NOTE: It's recommended to wait for a few minutes to allow deployed objects to become fully operational and start consuming resources.
+Ans: 
+student-node ~ ➜  kubectl top pods -A --context cluster1 --no-headers | sort -nr -k3 | head -1
+student-node ~ ➜  kubectl top pods -A --context cluster2 --no-headers | sort -nr -k3 | head -1
+student-node ~ ➜  kubectl top pods -A --context cluster3 --no-headers | sort -nr -k3 | head -1
+student-node ~ ➜  kubectl top pods -A --context cluster4 --no-headers | sort -nr -k3 | head -1
+Using this, find the pod that uses most CPU. In this case, it is kube-apiserver-cluster1-controlplane on cluster1.
+Save the result in the correct format to the file:
+student-node ~ ➜  echo cluster1,kube-system,kube-apiserver-cluster1-controlplane > /opt/high_cpu_pod
+-------------------------------------------------------------------------------------------------------
+Q: Find the node across all clusters that consumes the most memory and store the result to the file /opt/high_memory_node in the following format cluster_name,node_name
+Ans:
+kubectl top node --context cluster1 --no-headers | sort -nr -k2 | head -1
+kubectl top node --context cluster2 --no-headers | sort -nr -k2 | head -1
+kubectl top node --context cluster3 --no-headers | sort -nr -k2 | head -1
+kubectl top node --context cluster4 --no-headers | sort -nr -k2 | head -1
+echo cluster3,cluster3-controlplane > /opt/high_memory_node
+-------------------------------------------------------------------------------------------------------
+Q: There is a deployment called nodeapp-dp-cka08-trb created in the default namespace on cluster1. 
+This app is using an ingress resource named nodeapp-ing-cka08-trb.
+From cluster1-controlplane host we should be able to access this app using 
+the command: curl http://kodekloud-ingress.app. However, it is not working at the moment. Troubleshoot and fix the issue.
+Ans:
+ingress.yaml is as below and might need the corrections as below.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  creationTimestamp: "2024-03-08T17:24:07Z"
+  generation: 1
+  name: nodeapp-ing-cka08-trb
+  namespace: default
+  resourceVersion: "6277"
+  uid: 258fe6d9-7de4-4dc3-ba1a-d2d1c5982b77
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: kodekloud-ingress.app   <--update here
+    http:
+      paths:
+      - backend:
+          service:
+            name: nodeapp-svc-cka08-trb   #<-- update here
+            port:
+              number: 3000    <-- 80 to 3000
+        path: /
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 192.32.19.17
+-------------------------------------------------------------------------------------------------------
+Q: There is a pod called pink-pod-cka16-trb created in the default namespace in cluster4. 
+This app runs on port tcp/5000 and it is exposed to end-users using an ingress resource called pink-ing-cka16-trb 
+in such a way that it is supposed to be accessible using the command: curl http://kodekloud-pink.app on cluster4-controlplane host.
+However, this is not working. Troubleshoot and fix this issue, making any necessary to the objects.
+Note: You should be able to ssh into the cluster4-controlplane using ssh cluster4-controlplane command.
+Ans:
+ssh cluster4-controlplane
+curl kodekloud-pink.app (503 error)
+kubectl edit svc pink-svc-cka16-trb
+Under ports: change protocol: UDP to protocol: TCP
+curl kodekloud-pink.app (curl: (6) Could not resolve host: example.com)
+kubectl get deploy -n kube-system
+>>You will see that for coredns all relicas are down, you will see 0/0 ready pods. So let's scale up this deployment.)
+kubectl scale --replicas=2 deployment coredns -n kube-system
+curl kodekloud-pink.app
+
+-------------------------------------------------------------------------------------------------------
+Q:The cat-cka22-trb pod is stuck in Pending state. Look into the issue to fix the same. 
+Make sure that the pod is in running state and its stable (i.e not restarting or crashing).
+Note: Do not make any changes to the pod (No changes to pod config but you may destory and re-create).
+Ans:
+kubectl get pod (pending state)
+kubectl --context cluster2 get event --field-selector involvedObject.name=cat-cka22-trb
+logs:
+Warning   FailedScheduling   pod/cat-cka22-trb   0/3 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/master: }, 2 node(s) didn't match Pod's node affinity/selector. 
+preemption: 0/2 nodes are available: 3 Preemption is not helpful for scheduling.
+So seems like this POD is using the node affinity, let's look into the POD to understand the node affinity its using.
+kubectl --context cluster2 get pod cat-cka22-trb -o yaml
+Under affinity: you will see its looking for key: node and values: cluster2-node02 so let's verify if node01 has these labels applied.
+kubectl --context cluster2 get node cluster2-node01 -o yaml
+Look under labels: and you will not find any such label, so let's add this label to this node.
+
+kubectl label node cluster1-node01 node=cluster2-node01
+kubectl get node cluster2-node01 -o yaml
+kubectl --context cluster2 get pod
+kubectl --context cluster2 logs -f cat-cka22-trb
+The HOST variable seems incorrect, it must be set to kodekloud(log)
+kubectl --context cluster2 get pod -o yaml
+env:
+- name: HOST
+  valueFrom:
+    secretKeyRef:
+      key: hostname
+      name: cat-cka22-trb
+So we can see that HOST variable is defined and its value is being retrieved from a secret called "cat-cka22-trb". Let's look into this secret.
+kubectl --context cluster2 get secret
+kubectl --context cluster2 get secret cat-cka22-trb -o yaml
+echo "<the decoded value you see for hostname" | base64 -d (You will find a key/value pair under data:, let's try to decode it to see its value:)
+echo "kodekloud" | base64
+kubectl edit secret cat-cka22-trb
+Change requests storage hostname: a29kZWtsb3Vkdg== to hostname: a29kZWtsb3VkCg== (values may vary)
+POD should be good now.
+
+-------------------------------------------------------------------------------------------------------
+Q:In the dev-wl07 namespace, one of the developers has performed a rolling update and upgraded the application to a newer version. 
+But somehow, application pods are not being created.
+To get back the working state, rollback the application to the previous version .
+After rolling the deployment back, on the controlplane node, save the image currently in use to the /root/rolling-back-record.txt file and 
+increase the replica count to the 5.
+You can SSH into the cluster1 using ssh cluster1-controlplane command.
+Ans:
+kubectl config use-context cluster1
+kubectl get pods -n dev-wl07
+kubectl rollout undo -n dev-wl07 deploy webapp-wl07
+kubectl describe deploy -n dev-wl07 webapp-wl07 | grep -i image
+ssh cluster1-controlplane
+echo "kodekloud/webapp-color" > /root/rolling-back-record.txt
+kubectl scale deploy -n dev-wl07 webapp-wl07 --replicas=5
+kubectl get deploy -n dev-wl07
+
+-------------------------------------------------------------------------------------------------------
+Q: demo-pod-cka29-trb pod is stuck in aPending state, look into issue to fix the same, Make sure pod is in Running state and stable.
+Ans:
+kubectl get event --field-selector involvedObject.name=demo-pod-cka29-trb
+Warning:
+Warning   FailedScheduling   pod/demo-pod-cka29-trb   0/3 nodes are available: 3 pod has unbound immediate PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+kubectl get pvc
+kubectl get event --field-selector involvedObject.name=demo-pvc-cka29-trb
+Error as:
+Warning   VolumeMismatch   persistentvolumeclaim/demo-pvc-cka29-trb   Cannot bind to requested volume "demo-pv-cka29-trb": incompatible accessMode
+Edit the PVC and PV
+kubectl get pvc demo-pvc-cka29-trb -o yaml > /tmp/pvc.yaml
+vi /tmp/pvc.yaml
+kubectl delete pvc demo-pvc-cka29-trb
+kubectl apply -f /tmp/pvc.yaml 
+kubectl get pod demo-pod-cka29-trb
+
+-------------------------------------------------------------------------------------------------------
+Q: One of our applications runs on the cluster3-controlplane node. Due to the possibility of traffic increase, we want to scale the application pods to loadbalance the traffic and provide a smoother user experience.
+cluster3-controlplane node has enough resources to deploy more application pods. Scale the deployment called essports-wl02 to 5.
+Ans:
+kubectl config use-context cluster3
+kubectl get nodes -owide
+ssh cluster3-controlplane
+k scale deploy essports-wl02 --replicas=5
+-------------------------------------------------------------------------------------------------------
+Ans:
+Edit papaya-pv-cka09-str PV:
+
+kubectl get pv papaya-pv-cka09-str -o yaml > /tmp/papaya-pv-cka09-str.yaml
+Edit the template:
+
+vi /tmp/papaya-pv-cka09-str.yaml
+Delete all entries for uid:, annotations, status:, claimRef: from the template.
+Edit papaya-pvc-cka09-str PVC:
+
+kubectl get pvc papaya-pvc-cka09-str -o yaml > /tmp/papaya-pvc-cka09-str.yaml
+Edit the template:
+
+vi /tmp/papaya-pvc-cka09-str.yaml
+Under resources: -> requests: change storage: 50Mi to storage: 80Mi and save the template.
+Delete the exsiting PVC:
+
+kubectl delete pvc papaya-pvc-cka09-str
+Delete the exsiting PV and create using the template:
+
+kubectl delete pv papaya-pv-cka09-str
+kubectl apply -f /tmp/papaya-pv-cka09-str.yaml
+Create the PVC using template:
+
+kubectl apply -f /tmp/papaya-pvc-cka09-str.yaml
+
+-------------------------------------------------------------------------------------------------------
