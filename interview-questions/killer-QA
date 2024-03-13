@@ -1,0 +1,1053 @@
+export dr='--dry-run=client' -o yaml
+k run pod --image=nginx $dr (to test, whethere the above $dr is working or not)
+export now='--grace-period=0' --force'
+k run pod --image=nginx --sleep 1d
+k delete po pod $now 
+
+1Q: You have access to multiple clusters from your main terminal through kubectl contexts. Write all those context names into /opt/course/1/contexts.
+Next write a command to display the current context into /opt/course/1/context_default_kubectl.sh, the command should use kubectl.
+Finally write a second command doing the same thing into /opt/course/1/context_default_no_kubectl.sh, but without the use of kubectl.
+Ans:
+
+k config get-contexts
+k config get-contexts -o name > /opt/course/1/contexts
+
+echo "k config current-context" > /opt/course/1/context_default_kubectl.sh
+cat /opt/course/1/context_default_kubectl.sh
+sh /opt/course/1/context_default_kubectl.sh >> k8s-c1-H 
+
+cat ~/.kube/config | grep -i current-context
+cat ~/.kube/config | grep -i current-context | sed 's/current-context: //'
+k8s-c1-H
+cat ~/.kube/config | grep -i current-context | sed 's/current-context: //' > /opt/course/1/context_default_no_kubectl.sh
+------------------------------------------------------------------------------------------------------------------------------------------
+2Q: kubectl config use-context k8s-c1-H  (3%)
+Create a single pod of image httpd:2.4.41-alpine in Namespace default. 
+The pod should be named pod1 and the container should be na,ed pod1-container. 
+This pod should only be scheduled on a master node, do not add new labels any nodes.
+Ans:
+kubectl config use-context k8s-c1-H
+k run -n default pod1 --image=httpd:2.4.41-alpine $dr
+k run -n default pod1 --image=httpd:2.4.41-alpine $dr > 2.yaml
+vi 2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: pod1
+  name: pod1
+  namespace: default
+spec:
+  nodeName: cluster1-master1  <--added master node
+  containers:
+  - image: httpd:2.4.41-alpine
+    name: pod1-container
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+k apply -f 2.yaml
+k get pods -n default pod1
+k get pods -n default pod1 -o wide  >> running on the master node
+k describe pods -n default pod1
+------------------------------------------------------------------------------------------------------------------------------------------
+3Q: kubectl config use-context k8s-c1-H
+There are 2 pods named o3db-* in Namespace project-c13. C13 management asked you to scale the pods down to
+1 replica to save resources.
+Ans: 
+k get all -n project-c13
+no deployments, replicaseets found. But there is statefulset with o3db 2/2 whcih needs to be down to 1.
+k scale statefulset -n project-c13 o3db --replicas=1
+k get pods -n project-c13 | grep -i o3db
+k get statefulsets.apps -n project-c13
+o3db 1/1
+
+------------------------------------------------------------------------------------------------------------------------------------------
+4Q: Task weight: 4% 
+Use context: kubectl config use-context k8s-c1-H 
+Do the following in namespace default. Create a single pod named ready-if-service-ready of image nginx:1.16.1-alpine. 
+Configure a liveness probe which simply runs true. Also, configure a readiness probe which does check if the URL http://service-am-i-ready:80 is reachable, 
+you can use wget -T2 -0 http://service-am-i-ready:80 for this. 
+Start the pod and confirm it is not ready because of the readiness probe. 
+
+ii.Create a second pod named am-i-ready of image nginx:1.16.1-alpine with label id:cross-server-ready. 
+The already existing service service-am-i-ready should now have that second pod as endpoint. 
+Now, the first pod should be in ready state. Confirm that.
+
+Ans:kubectl config k8s-c1-H 
+k run ready-if-service-ready -n default --image=nginx:1.16.1-alpine $dr >4.yaml
+vi 4.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: ready-if-service-ready
+  name: ready-if-service-ready
+  namespace: default
+spec:
+  nodeName: cluster1-master1  <--added master node
+  containers:
+  - image: nginx:1.16.1-alpine
+    name: ready-if-service-ready
+    livenessProbe:
+      exec:
+        command:
+        - 'true'
+    readinessProbe:
+      exec:
+        command:
+        - sh
+        - -c 
+        - wget -T2 -0 http://service-am-i-ready:80 
+
+k get pods ready-if-service-ready -n default  >> none 
+k create -f 4.yaml
+0/1 and error is about readiness probe failed. 
+
+ii. #k run am-i-ready  -n default --image=nginx:1.16.1-alpine --labels="id=cross-server-ready"
+k get svc -n default service-am-i-ready
+k get ep -n default
+>> service-am-i-ready  <none>
+k run am-i-ready  -n default --image=nginx:1.16.1-alpine --labels="id=cross-server-ready"
+k get pods -n default am-i-ready -o wide
+>>10.47.0.23 cluster1-worker2
+k get ep -n default
+>> service-am-i-ready  10.47.0.23:80
+checking if the pod is ready
+k get pods ready-if-service-ready -n default  >> 1/1
+------------------------------------------------------------------------------------------------------------------------------------------
+5Q: Use context: kubectl config use-context k8s-c1-H 
+There are various Pods in all namespaces. Write a command into /opt/course/5/find_pods.sh which lists all pods
+sorted by their AGE(metadata.creationTimestamp).
+
+ii.Write a second command into /opt/course/5/find_pods_uid.sh which lists all Pods sorted by field metadata.uid. 
+Use kubectl sorting for both commands.
+
+Ans:
+kubectl config use-context k8s-c1-H 
+k get pods -A --sort-by=metadata.creationTimestamp
+echo "k get pods -A --sort-by=metadata.creationTimestamp" > /opt/course/5/find_pods.sh
+cat /opt/course/5/find_pods.sh
+sh /opt/course/5/find_pods.sh
+
+ii. k get pods -A --sort-by=metadata.uid
+echo "k get pods -A --sort-by=metadata.uid" > /opt/course/5/find_pods_uid.sh
+cat /opt/course/5/find_pods_uid.sh
+sh /opt/course/5/find_pods_uid.sh
+------------------------------------------------------------------------------------------------------------------------------------------
+6Q: Use context: kubectl config use-context k8s-c1-H  (8%)
+Create a new PersistentVolume named safari-pv. It should be have a capcity of 2Gi, accessMode ReadWriteOnce,
+hostPath /volumes/Data and no storageClassName defined.
+
+Next create a new PersistentVolumeClaim in Namespace project-tiger named safari-pvc. It should request 2Gi storage,
+AcecssMode ReadWriteOnce and should not define a storageClassName. The PVC should bound to the PV correctly.
+
+Finally create a new deployment safari in Namespace project-tiget which mounts that volume at tmp/safari-data.
+The pods of that Deployment should be of image https:2.4.41-alpine
+Ans:
+kubectl config use-context k8s-c1-H
+
+kubectl create pv safari-pv --capacity=2Gi --access-mode=ReadWriteOnce --host-path=/volumes/Data --storage-class=""
+OR
+safari-pv.yaml:
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: safari-pv
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /volumes/Data
+  storageClassName: ""
+k create -f safari-pv.yaml
+k get pv
+
+kubectl create namespace project-tiger
+kubectl create pvc safari-pvc --namespace=project-tiger --request=2Gi --access-mode=ReadWriteOnce --storage-class=""
+OR 
+safari-pvc.yaml:
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: safari-pvc
+  namespace: project-tiger
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: ""
+k create -f safari-pvc.yaml
+k get pvc -n project-tiger
+
+kubectl create deployment safari --namespace=project-tiger --image=httpd:2.4.41-alpine --dry-run=client -o yaml > safari-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safari
+  namespace: project-tiger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safari
+  template:
+    metadata:
+      labels:
+        app: safari
+    spec:
+      containers:
+      - name: safari-container
+        image: httpd:2.4.41-alpine
+        volumeMounts:
+        - name: safari-data
+          mountPath: /tmp/safari-data
+      volumes:
+      - name: safari-data
+        persistentVolumeClaim:
+          claimName: safari-pvc
+
+k create -f safari-deployment.yaml
+k get deployments.apps -n project-tiger
+
+------------------------------------------------------------------------------------------------------------------------------------------
+7Q: Task weight 1%
+Use context: kubectl config use-context k8s-c1-H
+The metrics-server has been installed in the cluster. Your college would ike to know the kubectl commands to:
+1. show Nodes resource usage
+2. show pods and their containers resource usage
+
+Please write the commands into /opt/course/7/node.sh and /opt/course/7/pod.sh
+Ans:
+kubectl config use-context k8s-c1-H
+k top node
+echo "k top node" > /opt/course/7/node.sh
+k top pods --containers
+echo "k top pods --containers" > /opt/course/7/pod.sh
+------------------------------------------------------------------------------------------------------------------------------------------
+8Q: Task weight 2%
+Use context: kubectl config use-context k8s-c1-H
+SSH into the master node with cluster1-master1. Check how the master components kubelet, kube-apiserver, kube-scheduler, kube-controller-manager and etcd are started/installed on the master node.
+Also find out the name of the DNS application and how it's started/installed on the master node.
+
+Write your findings into file /opt/course/8/master-components.txt. The file should be structured like:
+# /opt/course/8/master-components.txt
+kubelet: [TYPE]
+kube-apiserver: [TYPE] 
+kube-scheduler: [TYPE] 
+kube-controller-manager: [TYPE] 
+etcd: [TYPE] 
+dns: [TYPE] [NAME]
+choices of [TYPE]  are: not-installed, process, static-pod, pod
+
+Ans: ssh cluster1-master1
+vi /opt/course/8/master-components.txt
+kubelet: process
+kube-apiserver: static-pod 
+kube-scheduler: static-pod 
+kube-controller-manager: static-pod 
+etcd: static-pod
+dns: pod,coredns
+
+k get all -n kube-system
+k get all -n kube-system | grep -i dns 
+k get all -n kube-system | grep -i etcd
+pod/etcd-cluster1-master1   1/1   Running <-- This should be static pod as it indicates etcd with pod
+ls /etc/kubernetes/manifests/ | grep -i etcd
+>> etcd.yaml
+k get all -n kube-system | grep -i kube-controller-manager
+>> pod/kube-controller-manager
+k get all -n kube-system | grep -i kube-scheduler
+k get all -n kube-system | grep -i kube-apiserver
+k get all -n kube-system | grep -i kubelet
+ps aux | grep -i kubelet
+------------------------------------------------------------------------------------------------------------------------------------------
+9Q: Task weight 5%
+Use context: kubectl config use-context k8s-c1-H
+
+SSH into the master node with ssh cluster2-master1. Temporarily stop the kube-scheduler, 
+this means in a way that you can start it again afterwards.
+
+Create a single pod named manual-schedule of image httpd:2.4-alpine, confirm its created but not scheduled on any node.
+
+Now you're the scheduler and have all its power, manually schedule that pod on node cluster2-master1. Make sure it's running.
+
+Start kube-schedueler again and confirm its running correctly by creating a second pod named manual-schedule2 of
+image httpd:2.4-alpine and check if it's running on cluster2-worker1.
+
+Ans: kubectl config use-context k8s-c1-H
+ssh cluster2-master1
+cluster2-master1:~ k get pods -n kube-system | grep -i kube-schedueler
+cd /etc/kubernetes/manifests 
+ls -lrt
+mv ./kube-scheduler.yaml ../ or rename it.
+k run manual-schedule --image=httpd:2.4-alpine
+k get pods manual-schedule <-- Pending because there's no kube-scheduler on the location to schedule
+
+mv ../kube-schedueler.yaml ./
+k get pods -n kube-system --watch | grep -i kube-scheduler
+k get pods manual-schedule  <-- Running once kube-scheduler started running
+
+k run manual-schedule2 --image=httpd:2.4-alpine $dr > 9.yaml
+vi 9.yaml
+under spec:
+        nodeName: cluster2-master1
+k create -f 9.yaml
+k get pods manual-schedule2 -o wide --watch
+------------------------------------------------------------------------------------------------------------------------------------------
+10 Q: Task weight 6%
+Use context: kubectl config use-context k8s-c1-H 
+
+Create a new ServcieAccount processor in Namespace project-hamster. Create a Role and RoleBinding, 
+both named processor as well. These should allow the new SA to only create secrets and ConfigMaps in that Namespace.
+
+Ans: kubectl config use-context k8s-c1-H 
+k get sa -n project-hamster
+k create sa processor -n project-hamster
+k get sa -n project-hamster
+
+kubectl create role processor --namespace=project-hamster --resource=secrets,configmaps --verb=create
+k get role -n project-hamster
+k get describe role -n project-hamster
+kubectl create rolebinding processor --namespace=project-hamster --role=processor --serviceaccount=project-hamster:processor
+k auth can-i create secret -n project-hamster --as=system:serviceaccount:project-hamster:processor
+k auth can-i create configmaps -n project-hamster --as=system:serviceaccount:project-hamster:processor
+------------------------------------------------------------------------------------------------------------------------------------------
+11 Q: Task weight 4%
+Use context: kubectl config use-context k8s-c1-H 
+
+Use Namespace project-tiger for the following. Create a DaemonSet named ds-important with image httpd:2.4-alpine 
+and labels id=ds-important and uuid=24q35-3425-243543f-3245vw. The pods it creates should request 10 millicore cpu
+and 10 mebibyte memory. The pods of that Daemonset should run on all ndoes, master and worker.
+Ans: kubectl config use-context k8s-c1-H 
+kubectl create daemonset ds-important --namespace=project-tiger --image=httpd:2.4-alpine --labels=id=ds-important,uuid=24q35-3425-243543f-3245vw --requests=cpu=10m,memory=10Mi --node-selector=""
+kubectl get daemonset ds-important --namespace=project-tiger
+OR
+vi 11.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds-important
+  namespace: project-tiger
+spec:
+  selector:
+    matchLabels:
+      id: ds-important
+  template:
+    metadata:
+      labels:
+        id: ds-important
+        uuid: "24q35-3425-243543f-3245vw"
+    spec:
+      containers:
+      - name: ds-important-container
+        image: httpd:2.4-alpine
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "10Mi"
+  updateStrategy:
+    type: RollingUpdate
+  nodeSelector: {}
+------------------------------------------------------------------------------------------------------------------------------------------
+12 Q: Task weight 6%
+Use context: kubectl config use-context k8s-c1-H 
+Use Namespace project-tiger for the following. 
+Create a Deployment named deploy-important with label id=very-important (the pods should also have this label)
+and 3 replicas. It should contain two containers, the first named container1 with image nginx:1.17.6-alpine and the 
+second one named container2 with image kubernetes/pause.
+
+There shoul be only ever one pod of that Deployment running on one worker node. 
+We have two worker ndoes: cluster1-worker1 and cluster1-worker2.
+Because the Deployment has three replicas the result should be that on both nodes one pod is running. 
+The third pod won't be scheduled, unless a new worker node will be added.
+
+In a way we kind of simulate the bahaviour of a DaemonSet here, but using a Deployment and a fixed number of replicas.
+Ans:
+kubectl config use-context k8s-c1-H
+k create deployment deploy-important -n project-tiger --replicas=3 --image=1.17.6-alpine $dr > 12.yaml
+vi 12.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-important
+  namespace: project-tiger
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      id: very-important
+  template:
+    metadata:
+      labels:
+        id: very-important
+    spec:
+        affinity:
+   podAntiAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+     - labelSelector:
+        matchExpressions:
+        - key: id
+          operator: In
+          values:
+          - very-important
+       topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: container1
+        image: nginx:1.17.6-alpine
+      - name: container2
+        image: kubernetes/pause
+k create -f 12.yaml
+k get deployments.apps -n project-tiger
+k get pods -n project-tiger -o wide
+k describe deployments.apps -n project-tiger deploy-important
+------------------------------------------------------------------------------------------------------------------------------------------
+13 Q: Task weight 4%
+Use context: kubectl config use-context k8s-c1-H 
+
+Create a pod named multi-container-playground in namespace default with three containers named c1, c2, and c3. 
+There should be a volume attached to that pod and mounted into every container, 
+but the volume shouldn't be persisted or shared with other pods. 
+
+Container c1 should be of image nginx-1.17.6-alpine and have the name of the node where its pod is running 
+available as environment variable MY_NODE_NAME.
+
+Container c2 should be of image busybox-1.31.1 and write the output of the date command every second in the 
+shared volume into file date.log. You can use while true; do date >> /your/vol/path/date.log; sleep 1; done for this. 
+
+Container c3 should be of image busybox-1.31.1 and constantly send the content of file date.log from the 
+shared volume to stdout. You can use tail-f /your/vol/path/date.log for this. 
+
+Check the logs of container c3 to confirm correct setup.
+
+Ans:  kubectl config use-context k8s-c1-H 
+
+k run multi-container-playground -n default --image=nginx-1.17.6-alpine $dr > 13.yaml
+vi 13.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: rmulti-container-playground
+  name: multi-container-playground
+  namespace: default
+spec:
+  containers:
+  - image: nginx-1.17.6-alpine
+    name: c1
+    env:
+      - name: MY_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+    volumeMounts:
+      - name: shared-disk
+        mountPath: /data
+  - image: busybox-1.31.1
+    name: c2
+    command: [ "sh", "-c"]
+      args:
+      - while true; do date >> /your/vol/path/date.log; sleep 1; done
+    OR
+    command:
+       -  "sh"
+       -  "-c"
+       -  "while true; do date >> /your/vol/pathdate.log; sleep 1; done"
+    volumeMounts:
+      - name: shared-disk
+        mountPath: /data
+  - image: busybox:1.31.1
+    name: c3
+    commamnd:
+       -  "sh"
+       -  "-c"
+      - "tail -f /data/date.log"
+    volumeMounts:
+       - name: shared-disk
+         mountPath: /data
+    volumes:
+      - name: shared-disk
+        emptyDir:
+        sizeLimit: 500Mi
+
+k create -f 13.yaml
+k delete pod multi-container-playground $now
+k create -f 13.yaml
+k get pods
+k describe pod multi-container-playground -n default
+k exec -it multi-container-playground -c c1 -- printenv
+k exec -it multi-container-playground -c c1 -- printenv | grep -i MY_NODE_NODE
+k get pods multi-container-playground -o wide
+k exec -it multi-container-playground -c c2 -- cat /your/vol/path/date.log
+k exec -it multi-container-playground -c c3 -- cat /your/vol/path/date.log
+kubectl  logs multi-container-playground -c c3 -n default
+------------------------------------------------------------------------------------------------------------------------------------------
+14Q: Task weight 2%
+Use context: kubectl config use-context k8s-c1-H 
+
+You're asked to find out following information about the cluster k8s-c1-H:
+1. How many master nodes are available?
+2. How many worker nodes are available?
+3. What is the Service CIDR?
+4. Which Networking (or CNI plugin) is configured and where is its config file?
+5. Which suffix will static pods have that run on cluster1-worker1?
+Write your answers into file /opt/course/14/cluster-info, structured like this:
+# /opt/course/14/cluster-info
+1: [Answer]
+2: [Answer]
+3: [Answer]
+4: [Answer]
+5: [Answer]
+
+Ans:kubectl config use-context k8s-c1-H 
+vi /opt/course/14/cluster-info
+1: 1
+2: 2
+3: 10.96.0.0/12
+4: weave, /etc/cni/net.d/10-weave.conflist
+5: -cluster-worker1
+
+for 1 &2 
+k get nodes
+for 3, 
+ssh cluster1-master1 <-- kube-apiserver will have the CIDR of service
+cluster1-master1:~ k get pods -n kube-system | grep -i kube-api 
+>>kube-apiserver-cluster1-master1  1/1 Running
+cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep -i range
+- - -service-cluster-ip-range=10.96.0.0/12
+for 4,
+cd /etc/cni/net.d 
+>> 10-weave.conflist
+cat 10-weave.conflist
+for 5,
+it should start with prefix -
+
+------------------------------------------------------------------------------------------------------------------------------------------
+15Q: Task weight 2%
+Use context: kubectl config use-context k8s-c1-H 
+Write a command into /opt/course/15/cluster_events.sh which shows the latest events in the whole cluster, 
+ordered by time (metadata.creationTimestamp). Use kubectl for it
+
+Now kill the kube-proxy pod running on node cluster2-worker1 and write the events this caused into /opt/course/15/pod_kill.log
+
+Finally kill the containerd container of the kube-proxy pod on node cluster2-worker1 and write the events into /opt/course/15/container_kill.log
+
+Do you notice differences in the events both actions caused?
+Ans:
+kubectl config use-context k8s-c1-H 
+k get event -A --sort-by="metadata.creationTimestamp"
+echo 'kubectl get events -A --sort-by="metadata.creationTimestamp"' > /opt/course/15/cluster_events.sh
+sh /opt/course/15/cluster_events.sh
+k: not found and add kubectl
+
+k get pods -o wide -n kube-system | grep -i kube-proxy 
+k delete pod kube-proxy-m95k2 -n kube-system 
+kubectl get events -n kube-system --sort-by="metadata.creationTimestamp"
+copy specifically applies from stopping container kube-proxy
+vi /opt/course/15/pod_kill.log
+
+k get pods -o wide -n kube-system | grep -i kube-proxy 
+ssh cluster2-worker1
+cluster2-worker1:~ crictls ps
+crictl stop <contaierid of kube-proxy>
+crictl rm <contaierid of kube-proxy>
+crictl ps
+
+k8s@terminal:~ kubectl get events -n kube-system --sort-by="metadata.creationTimestamp"
+57s .... logs <--copy the whole till end 
+
+vi /opt/course/15/container_kill.log
+paste in this file
+cat /opt/course/15/container_kill.log
+------------------------------------------------------------------------------------------------------------------------------------------
+16Q: Task weight 2%
+Use context: kubectl config use-context k8s-c1-H 
+
+Create a new Namespace called cka-master.
+
+Write the names of all namespaced Kubernetes resources (like Pod, Secret, ConfigMap..) into /opt/course/16/crowded-resources.txt
+
+Find the project-* Namespace with the highest number of Roles defined in it and write its name and 
+amount of Roles into /opt/course/16/crowded-namespace.txt
+
+Ans: kubectl config use-context k8s-c1-H 
+k get ns
+k create ns cka-master
+k api-resources --namespaced -o name
+k api-resources --namespaced -o name > /opt/course/16/crowded-resources.txt
+k get ns project-*
+k get roles -A 
+
+kubectl get namespaces --no-headers=true -o custom-columns="NAMESPACE:.metadata.name,ROLES:$(kubectl get roles --all-namespaces --no-headers=true -o custom-columns=:.metadata.namespace | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}')"
+OR
+k get roles -A --no-headers | awk '{print $1}' | sort | uniq -c
+OR
+k get roles -n project-c14 --no-headers | wc -l
+
+vi /opt/course/16/crowded-namespace.txt
+project-c14 300 
+------------------------------------------------------------------------------------------------------------------------------------------
+17Q: Task weight 3%
+Use context: kubectl config use-context k8s-c1-H 
+
+In Namespace project-tiger create a Pod named tigers-reunite of image httpd:2.4.41-alpine with labels pod=container and
+container=pod. Find out on which node the Pod is scheduled. SSH into that node and find the containerd
+container belonging to that pod.
+
+Using command crictl:
+1. Write the ID of the container and the info.runtimeType into /opt/course/17/pod-container.txt
+2. Write the logs of the container into /opt/course/17/pod-container.log
+Ans: kubectl config use-context k8s-c1-H 
+
+k run -n project-tiger tigers-reunite --image=httpd:2.4.41-alpine --labels="pod=container,container=pod" $dr
+k run -n project-tiger tigers-reunite --image=httpd:2.4.41-alpine --labels="pod=container,container=pod"
+k get pods -n project-tiger tigers-reunite
+k get pods -n project-tiger tigers-reunite -o wide
+>> cluster1-worker2
+ssh cluster1-worker2
+
+1. cluster1-worker2:~ crictl ps
+crictl ps | grep -i tigers-reunite
+>>esrgdhdrdgrgt
+crictl inspect esrgdhdrdgrgt | grep -i info.runtimeType
+crictl inspect esrgdhdrdgrgt | grep -i runtimeType
+crictl inspect esrgdhdrdgrgt | grep -i runtimeType -B 20
+"runtimeType": io.containerd.runc.v2
+
+vi /opt/course/17/pod-container.txt
+esrgdhdrdgrgt io.containerd.runc.v2
+
+2. cluster1-worker2:~ crictl logs esrgdhdrdgrgt
+OR
+k8s@terminal:~ ssh cluster1-worker2 'crictl logs esrgdhdrdgrgt'
+ssh cluster1-worker2 'crictl logs esrgdhdrdgrgt' &> /opt/course/17/pod-container.log
+cat /opt/course/17/pod-container.log
+------------------------------------------------------------------------------------------------------------------------------------------
+18Q: Task weight 8%
+Use context: kubectl config use-context k8s-c3-ccc
+
+There seems to be an issue with kubelet not running on cluster3-worker1. 
+Fix it and confirm that cluster has node cluster3-worker1 available in Ready state afterwards. 
+You should be able to schedule a Pod on cluster3-worker1 afterwards.
+
+Write the reason of the issue into /opt/course/18/reason.txt
+Ans: kubectl config use-context k8s-c3-ccc
+k get nodes
+ssh cluster3-worker1
+cluster3-worker1:~ ps aux | grep -i kubelet 
+service kubelet status
+service kubelet restart
+service kubelet status
+Drop-In: /etc/systemd/system/kubelet.service.d
+         |_10-kubeadm.conf
+process: 27564 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS
+ls -lrt /usr/local/bin/kubelet
+>> no such file or directory
+vi /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+whereis kubelet
+>> kubelet: /usr/bin/kubelet
+
+vi /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+>> udpate it from /usr/local/bin/kubelet to /userr/bin/kubelet
+systemctl daemon-reload && systemctl restart kubelet
+service kubelet status
+>>active and running
+
+vi /opt/course/18/reason.txt
+Incorrect path '/usr/local/bin/kubelet' for kubelet set in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+Corrected the path to /usr/bin/kubelet'
+------------------------------------------------------------------------------------------------------------------------------------------
+19Q:Task weight 3%
+NOTE: This task can only be solved if questions 18 or 20 have been successfully implemented and the 
+k8s-c3-ccc cluster has a functioning worker node.
+Use context: kubectl config use-context k8s-c3-ccc
+
+Do the following in a new Namespace secret. Create a pod named secret-pod of image busybox:1.31.1 
+which should keep running for sometime.
+
+There is an existing secret located at /opt/course/19/secret1.yaml, create it in the Namespace secret and 
+mount it readonly into the Pod at /tmp/secret1.
+
+Create a new Secret in namespace secret called secret2 which should contain user=user1 and pass=1234.
+These entries shoyld be available inside the Pod's container as environment variables APP_USER and APP_PASS.
+Confirm everything is working.
+Ans: kubectl config use-context k8s-c3-ccc
+
+k get ns
+k create ns secret
+k run secret-pod --image=busybox:1.31.1 --command sleep 6000
+
+namespace: secret <-- it was named as todo
+k get secrets -n secret
+
+vim /opt/course/19/secret1.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-pod
+  namespace: secret
+spec:
+  volumes:
+  - name: secret-volume
+      secret:
+        secretName: secret1
+  containers:
+  - name: secret-pod
+    image: busybox:1.31.1
+    command: ["sh", "-c", "sleep 1d"]
+    env:
+    - name: APP_USER
+      valueFrom:
+        secretKeyRef:
+          name: secret2
+          key: user
+    - name: APP_PASS
+      valueFrom:
+        secretKeyRef:
+          name: secret2
+          key: pass
+    volumeMounts:
+      - name: secret-volume
+        readOnly: true
+        mountPath: "/tmp/secret1"
+
+k create -f /opt/course/19/secret1.yaml
+
+k create secret generic secret2 -n secret --from-literal="user=user1" --from-literal="pass=1234" 
+------------------------------------------------------------------------------------------------------------------------------------------
+20 Q: Task weight 10%
+Use context: kubectl config use-context k8s-c3-ccc
+
+Your coworker said node cluster3-worker2 is running an older Kubernetes version and is not even part of the cluster.
+Update Kubernetes on that node to the exact version that's running on cluster3-master1. Then add this node to the cluster.
+Use kubeadm for this.
+Ans: kubectl config use-context k8s-c3-ccc
+k get nodes
+cluster3-master1   v1.25.2
+cluster3-worker1   v1.25.2
+ssh cluster3-worker2
+cluster3-worker2:~ kubeadm --version
+v1.25.2 
+kubelet --version
+v1.24.6
+kubeadm upgrade and workernode upgrade in kubernetes.io
+https://v1-25.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-worker-nodes
+we only need to choose kubelet and kubectl as kubeadm is already usign the current version.
+But, we can check with 
+kubeadm upgrade node <-- nothing happens
+
+apt-mark unhold kubelet kubectl && \
+apt-get update && apt-get install -y kubelet=1.25.2-00 kubectl=1.25.2-00 && \
+apt-mark hold kubelet kubectl
+
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+cluster3-worker2:~ sardthfjgkrsljdghfrh
+
+https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-token/
+k8s@terminal:~ ssh cluster3-master1
+cluster3-master1:~ kubeadm token create --print-join-command
+sardthfjgkrsljdghfrh (take this token and execute back in worker2 node)
+kubeadm token list 
+cluster3-master1:~ exit 
+
+k8s@terminal:~ k get nodes
+cluster3-master1   v1.25.2
+cluster3-worker1   v1.25.2
+cluster3-worker2   v1.25.2
+------------------------------------------------------------------------------------------------------------------------------------------
+21Q: Task weight 2%
+Use context: kubectl config use-context k8s-c3-ccc
+Create a Static pod named my-static-pod in Namespace default on cluster3-master1. It should be of image
+nginx:1.16-alpine and have resource requests for 10m CPU and 20Mi memory.
+
+Then create a NodePort Service named static-pod-service which exposes that static Pod on port 80 and 
+check if it has Endpoints and if its reachable through the cluster3-master1 internal IP address. 
+You can connect to the internal node IPs from your main terminal.
+
+Ans: kubectl config use-context k8s-c3-ccc
+
+k run my-static-pod -n default --image=nginx:1.16-alpine $dr  <-- copy the code and paste it under below manifests folder
+ssh cluster3-master1
+cluster3-master1:~ cd /etc/kubernetes/manifests
+cluster3-master1:/etc/kubernetes/manifests# ls -lrt
+cluster3-master1:/etc/kubernetes/manifests# vi my-static-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-static-pod
+  namespace: default
+spec:
+  containers:
+  - name: my-static-pod
+    image: nginx:1.16-alpine
+    resources:
+      requests:
+        memory: "20Mi"
+        cpu: "10m"
+
+kubectl apply -f my-static-pod.yaml
+
+kubectl expose pod my-static-pod --name=static-pod-service --port=80 --target-port=80 --type=NodePort --dry-run=client -o yaml > static-pod-service.yaml
+kubectl apply -f static-pod-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-pod-service
+  namespace: default
+spec:
+  selector:
+    podName: my-static-pod
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort
+
+k get svc -n default
+
+cluster3-master1:/etc/kubernetes/manifests# kubectl get endpoints -n default
+>>static-pod-service  10.32.0.4:80
+cluster3-master1:/etc/kubernetes/manifests# k get pods -n deafult my-static-pod-cluster3-master1 -o wide
+>> my-static-pod-cluster3-master1    10.32.0.4
+
+k8s@terminal:~ k -n default exec -it my-static-pod-cluster3-master1 -- ping 10.32.0.4
+>> it's working
+k -n default exec -it my-static-pod-cluster3-master1 -- nslooup 10-31-0-4.default.cluster.local
+------------------------------------------------------------------------------------------------------------------------------------------
+22 Q: Task weight: 2%
+Use context: kubectl config use-context k8s-c2-AC 
+
+Check how long the kube-apiserver server certificate is valid on cluster2-master1. Do this with openssl or cfssl.
+Write the expiration date into /opt/course/22/expiration.
+
+Also run the correct kubeadm command to list the expiration dates and confirm both methods show the same date.
+
+Write the correct kubeadm command that would renew the apiserver server certificate into /opt/course/22/kubeadm-renew-certs.sh.
+
+Ans: kubectl config use-context k8s-c2-AC 
+echo | openssl s_client -connect cluster2-master1:6443 2>/dev/null | openssl x509 -noout -enddate | awk -F'=' '{print $2}' > /opt/course/22/expiration
+OR
+ssh cluster2-master1
+cluster2-master1:~ k get pods -n kube-system | grep -i kube-api
+cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep -i cert
+>> - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt 
+openssl x509 -noout --text -in /etc/kubernetes/pki/apiserver.crt | grep -i validity -A 2
+>> Not Before: Sep 29 13:55:46 2022 GMT
+   Not After:  Dec 14 21:06:04 2023 GMT
+k8s@terminal:~ vi /opt/course/22/expiration 
+Dec 14 21:06:04 2023 GMT
+Dec 14, 2023 21:06 UTC
+
+echo "kubeadm certs renew apiserver" > /opt/course/22/kubeadm-renew-certs.sh
+
+cluster2-master1:~ kubeadm certs check-expiration
+>> Dec 14, 2023 21:06 UTC <-- update this back in that above file
+
+cluster2-master1:~  kubeadm certs renew apiserver
+will observe 21:20 as time
+------------------------------------------------------------------------------------------------------------------------------------------
+23 Q: Task weight: 2%
+Use context: kubectl config use-context k8s-c2-AC 
+
+Node Cluster2-Worker1 has been added to the cluster using Kubeadm and TLS bootstrapping. 
+Find the "Issuer" and "Extended Key Usage" values of the Cluster2-Worker1. 
+1. Kubelet Client Certificate, the one used for outgoing connections to the Kubeapi-server. 
+2. Kubelet Server Certificate, the one used for incoming connections from the Kubeapi-server. 
+
+Write the information into file opt-course-23-certificate-info.txt. 
+Compare the "Issuer" and "Extended Key Usage" fields of both certificates and make sense of these.
+
+Ans: kubectl config use-context k8s-c2-AC
+k8s@terminal:~ vi opt-course-23-certificate-info.txt
+CN = kubernetes
+TLS Web Client Authentication
+CN = cluster2-worker1-ca@13454
+TLS Web Server Authentication 
+
+
+ssh Cluster2-Worker1
+service kubelet status
+cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+>> -- kube config=/etc/kubernetes/kubelet.conf
+cat /etc/kubernetes/kubelet.conf | grep -i cert
+>> client-certificate: /var/lib/kubelet/pki/kubelet-client-current.pem
+cat /var/lib/kubelet/pki/kubelet-client-current.pem
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet-client-current.pem
+
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet-client-current.pem | grep -i Issuer
+Issuer: CN = kubernetes <-- goes to opt-course-23-certificate-info.txt
+
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet-client-current.pem | grep -i usage
+X509v3 Key Usage: critical
+X509v3 Extended Key Usage
+
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet-client-current.pem | grep -i "Extended Key usage" -A 10
+>> TLS Web Client Authentication <-- goes to opt-course-23-certificate-info.txt
+
+ls -lrt /var/lib/kubelet/pki
+>> kubelet.crt
+   kubelet.key
+   kubelet-client-current.pem (till now used above)
+
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet.crt | grep -i Issuer
+Issuer: CN = cluster2-worker1-ca@13454 <-- goes to opt-course-23-certificate-info.txt
+
+openssl x509 --noout --text -in /var/lib/kubelet/pki/kubelet.crt | grep -i "Extended Key usage" -A 10
+>> TLS Web Server Authentication <-- goes to opt-course-23-certificate-info.txt
+
+------------------------------------------------------------------------------------------------------------------------------------------
+24 Q: Task weight: 9%
+Use context: kubectl config use-context k8s-c1-H
+
+There was a security incident where an intruder was able to access the whole cluster from a single hacked backend Pod.
+
+To prevent this create a NetworkPolicy called np-backend in Namespace project-snake. It should allow the backend-* Pods only to:
+
+* connect to db1-* Pods on port 1111
+* connect to db2-* Pods on port 2222
+
+Use the app label of Pods in your policy.
+
+After implementation, connections from backend-* Pods to vault-* Pods to port 3333 should for example no longer work.
+
+Ans: kubectl config use-context k8s-c1-H
+
+k get all -o wide -n project-snake
+k exec -it -n project-snake backend-0 -- curl 10.47.0.11:1111
+>> database one
+k exec -it -n project-snake backend-0 -- ping 10.47.0.11
+
+k exec -it -n project-snake backend-0 -- curl 10.47.0.12:2222
+>> database two
+k exec -it -n project-snake backend-0 -- ping 10.47.0.12
+
+k exec -it -n project-snake backend-0 -- curl 10.47.0.13:3333
+>> vault secret storagen (shouldn't be working later)
+k exec -it -n project-snake backend-0 -- ping 10.47.0.13 
+
+To see the Labels,
+k get -n project-snake pods --show-labels
+>>app=backend
+vi 24.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-backend
+  namespace: project-snake
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: db1
+    ports:
+    - protocol: TCP
+      port: 1111
+  - from:
+    - podSelector:
+        matchLabels:
+          app: db2
+    ports:
+    - protocol: TCP
+      port: 2222
+
+OR
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-backend
+  namespace: project-snake
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: project-snake
+      podSelector:
+        matchLabels:
+          app: db1
+    ports:
+    - protocol: TCP
+      port: 1111
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: project-snake
+      podSelector:
+        matchLabels:
+          app: db2
+    ports:
+    - protocol: TCP
+      port: 2222
+
+To get the namespace labels,
+k get ns proejct-snake --show-labels
+>> project-snake    kubernetes.io/metadata.name=project.snake
+
+k create -f 24.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+25 Q: Task weight 8%
+Use context: kubectl config use-context k8s-c3-ccc
+
+Make a backup of etcd running on cluster3-master1 and save it on the master node at /tmp/etcd-backup.db 
+
+Then create a Pod your kind in the cluster.
+Finally restore the backup, confirm the cluster is still working and that the created Pod is no longer with us.
+
+Ans: kubectl config use-context k8s-c3-ccc
+
+k get pods -n kube-system --no-headers | wc -l
+>> 12
+ETCDCTL_API=3 etcdctl snapshot save -h 
+ssh cluster3-master1
+cat /etckubernetes/manifest/etcd.yaml | grep file
+For endpoint: vi /etckubernetes/manifest/etcd.yaml
+ListenUrl=https://127.0.0.1:2379 (copy it)
+
+ETCDCTL_API=3 etcdctl --endpoints 127.0.0.1:2379 snapshot save /opt/etcd-backup.db \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  >>snapshot saved at /opt/etcd-backup.db
+
+cluster3-master1:~ k run test --image=nginx --command sleep 1d
+k get pods
+test 1/1 Running 
+
+
+cat /etc/kubernetes/manifests/etcd.yaml | grep -i data
+- -- data-dir=/var/lib/etcd
+
+ETCDC TL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key  \
+  snapshot restore /var/lib/etcd-backup-l
+
+vi /etckubernetes/manifest/etcd.yaml
+update the line says,
+- hostPath:
+    path: /var/lib/etcd-backup-l  <-- change it from path: /var/lib/etcd
+
+k get pods -n kube-system 
+watch crictl ps
+k get pods -n kube-system --no-headers | wc -l
+>> 12 Now, it's good.

@@ -1501,3 +1501,4 @@ service/wear-service-cka09-svcn exposed
 k get svc -n app-space
 NAME                      TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
 wear-service-cka09-svcn   LoadBalancer   10.43.68.233   172.25.0.14   8080:32109/TCP   14s
+------------------------------------------------------------------------------------------------------------------------------------------
