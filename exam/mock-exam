@@ -998,18 +998,17 @@ Warning   FailedScheduling   pod/demo-pod-cka29-trb   0/3 nodes are available: 3
 kubectl get pvc
 kubectl get event --field-selector involvedObject.name=demo-pvc-cka29-trb
 Error as:
-Warning   VolumeMismatch   persistentvolumeclaim/demo-pvc-cka29-trb   Cannot bind to requested volume "demo-pv-cka29-trb": incompatible accessMode
+Warning: VolumeMismatch persistentvolumeclaim/demo-pvc-cka29-trb Cannot bind to requested volume "demo-pv-cka29-trb": incompatible accessMode
 Edit the PVC and PV
 kubectl get pvc demo-pvc-cka29-trb -o yaml > /tmp/pvc.yaml
 vi /tmp/pvc.yaml
-
-kubectl replace --force -f /tmp/pvc.yaml
-OR
+Let's re-create the PVC with correct access mode i.e ReadWriteMany
+•	Under spec: change accessModes: from ReadWriteOnce to ReadWriteMany
 kubectl delete pvc demo-pvc-cka29-trb
 kubectl apply -f /tmp/pvc.yaml 
-
 kubectl get pod demo-pod-cka29-trb
-
+OR
+kubectl replace --force -f /tmp/pvc.yaml
 ------------------------------------------------------------------------------------------------------------------------------------------
 Q: One of our applications runs on the cluster3-controlplane node. Due to the possibility of traffic increase, we want to scale the application pods to loadbalance the traffic and provide a smoother user experience.
 cluster3-controlplane node has enough resources to deploy more application pods. Scale the deployment called essports-wl02 to 5.
@@ -1892,8 +1891,10 @@ spec:
 
   kubectl exec curlpod-cka01-svcn -- curl curlme-cka01-svcn
 ------------------------------------------------------------------------------------------------------------------------------------------
-Q:A service account called deploy-cka19-trb is created in cluster1 along with a cluster role called deploy-cka19-trb-role. This role should have the permissions to get all the deployments under the default namespace. However, at the moment, it is not able to. 
+Q:A service account called deploy-cka19-trb is created in cluster1 along with a cluster role called deploy-cka19-trb-role. 
+This role should have the permissions to get all the deployments under the default namespace. However, at the moment, it is not able to. 
 Find out what is wrong and correct it so that the deploy-cka19-trb service account is able to get deployments under default namespace.
+Ans:
 Let's see if deploy-cka19-trb service account is able to get the deployments.
 kubectl auth can-i get deployments --as=system:serviceaccount:default:deploy-cka19-trb
 We can see its not since we are getting no in the output.
@@ -1957,8 +1958,216 @@ Use the following instructions to create the pod and related objects: 
 - The main container should use the nginx image and mount a volume
 called grape-vol-cka06-str at path /var/log/nginx.
 - The sidecar container can use busybox image, 
-you might need to add a sleep command to this container to keep it running. Next, mount the same volume called grape-vol-cka06-str at the path /usr/src.
+you might need to add a sleep command to this container to keep it running. Next, 
+mount the same volume called grape-vol-cka06-str at the path /usr/src.
 The volume should be of type emptyDir.
 Ans:
+grape-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grape-pod-cka06-str
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    volumeMounts:
+      - name: grape-vol-cka06-str
+        mountPath: "/var/log/nginx"
+  - name: busybox
+    image: busybox
+    command:
+      - "bin/sh"
+      - "-c"
+      - "sleep 10000"
+    volumeMounts:
+      - name: grape-vol-cka06-str
+        mountPath: "/usr/src"
+  volumes:
+  - name: grape-vol-cka06-str
+    emptyDir: {}
+
+k apply -f grape-pod.yaml
 
 ------------------------------------------------------------------------------------------------------------------------------------------
+Q: Run a pod called looper-cka16-arch using the busybox image that runs the while loop while true; do echo hello; sleep 10;done. 
+This pod should be created in the default namespace.
+Ans:
+vi looper-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: looper-cka16-arch
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ["/bin/sh", "-c", "while true; do echo hello; sleep 10;done"]
+
+k apply -f looper-pod.yaml
+
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: There is an existing persistent volume called orange-pv-cka13-trb. A persistent volume claim called orange-pvc-cka13-trb is created to claim storage from orange-pv-cka13-trb.
+However, this PVC is stuck in a Pending state. As of now, there is no data in the volume.
+Troubleshoot and fix this issue, making sure that orange-pvc-cka13-trb PVC is in Bound state.
+kubectl  get pvc
+kubectl get events --sort-by='.metadata.creationTimestamp' -A
+>> Warning   VolumeMismatch            persistentvolumeclaim/orange-pvc-cka13-trb
+Cannot bind to requested volume "orange-pv-cka13-trb": requested PV is too small
+kubectl get pv
+kubectl get pvc orange-pvc-cka13-trb -o yaml > /tmp/orange-pvc-cka13-trb.yaml
+vi /tmp/orange-pvc-cka13-trb.yaml
+•	Under resources: -> requests: -> storage: change 150Mi to 100Mi and save.
+k replace --force -f /tmp/orange-pvc-cka13-trb.yaml
+OR 
+kubectl delete pvc orange-pvc-cka13-trb
+kubectl apply -f /tmp/orange-pvc-cka13-trb.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: We deployed an app using a deployment called web-dp-cka06-trb. it's using the httpd:latest image. 
+There is a corresponding service called web-service-cka06-trb that exposes this app on the node port 30005. 
+However, the app is not accessible! 
+Troubleshoot and fix this issue. Make sure you are able to access the app using curl http://kodekloud-exam.app:30005 command.
+Ans:
+kubectl get deploy
+kubectl get pod
+kubectl get event --field-selector involvedObject.name=web-dp-cka06-trb-5d6759ddc9-jrx26
+k get pvc
+kubectl edit deploy web-dp-cka06-trb
+•	Under spec: -> containers: -> change image from httpd:letest to httpd:latest and save the changes.
+•	Under containers: -> lifecycle: -> postStart: -> exec: -> command: change /bin to /bin/sh
+kubectl edit svc web-service-cka06-trb
+>>Let's verify if the selector labels and ports are correct as needed. 
+>>You will note that service is using selector: -> app: web-cka06-trb
+kubectl get deploy web-dp-cka06-trb -o yaml
+>>Under labels you will see labels: -> deploy: web-app-cka06-trb
+>>So we can see that service is using wrong selector label, let's edit the service to fix the same
+kubectl edit svc web-service-cka06-trb
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: A pod called nginx-cka01-trb is running in the default namespace. There is a container called nginx-container running inside this pod 
+that uses the image nginx:latest. There is another sidecar container called logs-container that runs in this pod.
+For some reason, this pod is continuously crashing. Identify the issue and fix it. Make sure that the pod is in a running state and
+you are able to access the website using the curl http://kodekloud-exam.app:30001 command on the controlplane node of cluster1.
+Ans:
+kubectl logs -f nginx-cka01-trb -c nginx-container
+kubectl edit pod nginx-cka01-trb -o yaml
+•	Change image tag from nginx:latst to nginx:latest
+kubectl get pod
+kubectl logs -f nginx-cka01-trb -c nginx-container
+cat: can't open '/var/log/httpd/access.log': No such file or directory
+cat: can't open '/var/log/httpd/error.log': No such file or directory
+kubectl get pod nginx-cka01-trb -o yaml
+Under containers: check the command: section, this is the command which is failing. 
+If you notice it’s looking for the logs under /var/log/httpd/ directory but the mounted volume for logs is /var/log/nginx (under volumeMounts:). 
+So, we need to fix this path:
+kubectl get pod nginx-cka01-trb -o yaml > /tmp/test.yaml
+vi /tmp/test.yaml
+Under command: change /var/log/httpd/access.log and /var/log/httpd/error.log to
+                       /var/log/nginx/access.log and /var/log/nginx/error.log respectively.
+kubectl delete pod nginx-cka01-trb
+kubectl apply -f /tmp/test.yaml
+kubectl get pod
+curl http://kodekloud-exam.app:30001
+>> Connection refused
+kubectl edit svc nginx-service-cka01-trb -o yaml 
+•	Change app label under selector from httpd-app-cka01-trb to nginx-app-cka01-trb
+curl http://kodekloud-exam.app:30001
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster4
+On cluster4 we are having some weird issue where we are intermittently getting below error while running kubectl commands.
+The connection to the server cluster4-controlplane:6443 was refused - did you specify the right host or port?
+Whenever you get this error, you can wait for 10-15 seconds to make kubectl command work again, but it will come again after few second
+We also noticed that kube-controller-manager-cluster4-controlplane pod is restarting continuously. Look into the issue and troubleshoot the same.
+You can SSH into the cluster4 using ssh cluster4-controlplane command.
+Ans:
+kubectl get pod --context=cluster4 -n kube-system
+kubectl logs -f kube-controller-manager-cluster4-controlplane --context=cluster4 -n kube-system
+kubectl logs -f kube-apiserver-cluster4-controlplane -n kube-system
+kubectl get event --field-selector involvedObject.name=kube-apiserver-cluster4-controlplane -n kube-system
+ssh cluster4-controlplane
+vi /etc/kubernetes/manifests/kube-apiserver.yaml
+Under livenessProbe: you will see the port: value is 6444, change it to 6443 and save. 
+Now wait for few seconds let the kube api pod come up.
+kubectl get pod -n kube-system
+
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+A pod definition file is created at /root/peach-pod-cka05-str.yaml on the student-node. 
+Update this manifest file to create a persistent volume claim called peach-pvc-cka05-str to claim a 100Mi of storage 
+from peach-pv-cka05-str PV (this is already created). Use the access mode ReadWriteOnce.
+
+Further add peach-pvc-cka05-str PVC to peach-pod-cka05-str POD and mount the volume at /var/www/html location. 
+Ensure that the pod is running and the PV is bound.
+Ans:
+
+vi /root/peach-pod-cka05-str.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: peach-pvc-cka05-str
+spec:
+  volumeName: peach-pv-cka05-str
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: peach-pod-cka05-str
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    volumeMounts:
+      - mountPath: "/var/www/html"
+        name: nginx-volume
+  volumes:
+    - name: nginx-volume
+      persistentVolumeClaim:
+        claimName: peach-pvc-cka05-str
+
+k apply -f /root/peach-pod-cka05-str.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+
+Create a storage class with the name banana-sc-cka08-str as per the properties given below:
+- Provisioner should be kubernetes.io/no-provisioner,
+- Volume binding mode should be WaitForFirstConsumer.
+- Volume expansion should be enabled.
+Ans: kubectl config use-context cluster1
+banana-sc.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: banana-sc-cka08-str
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+k apply -f banana-sc.yaml
+kubectl get storageclass banana-sc-cka08-str
+
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster1
+The green-deployment-cka15-trb deployment is having some issues since the corresponding POD is crashing and 
+restarting multiple times continuously.
+Investigate the issue and fix it, make sure the POD is in running state and its stable (i.e NO RESTARTS!).
+Ans: kubectl config use-context cluster1
+kubectl get pod
+kubectl logs -f green-deployment-cka15-trb-xxxx
+kubectl delete pod green-deployment-cka15-trb-xxxx
+kubectl get pod
+kubectl get deploy
+kubectl edit deploy green-deployment-cka15-trb
+Under resources: -> limits: change memory from 256Mi to 512Mi and save the changes.
+kubectl get pod
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: kubectl config use-context cluster3
+Create a deployment named hr-web-app-cka08-svcn using the image kodekloud/webapp-color with 2 replicas.
+Expose the hr-web-app-cka08-svcn as service hr-web-app-service-cka08-svcn application on port 30082 on the nodes of the cluster.
+The web application listens on port 8080.
+Ans: kubectl config use-context cluster3
+kubectl create deployment  hr-web-app-cka08-svcn --image=kodekloud/webapp-color --replicas=2
+kubectl expose deployment hr-web-app-cka08-svcn --type=NodePort --port=8080 --name=hr-web-app-service-cka08-svcn --dry-run=client -o yaml > hr-web-app-service-cka08-svcn.yaml
