@@ -575,7 +575,8 @@ kubectl logs orange-cron-cka10-trb-xxxx
 You will see some error like
 
 curl: (6) Could not resolve host: orange-app-cka10-trb
-You will notice that the curl is trying to hit orange-app-cka10-trb directly but it is supposed to hit the relevant service which is orange-svc-cka10-trb so we need to fix the curl command.
+You will notice that the curl is trying to hit orange-app-cka10-trb directly but it is supposed to hit the 
+relevant service which is orange-svc-cka10-trb so we need to fix the curl command.
 
 Edit the cronjob
 kubectl edit cronjob orange-cron-cka10-trb
@@ -808,21 +809,6 @@ student-node ~ ➜  ssh cluster3-controlplane
 
 cluster3-controlplane:~# curl -I 172.25.0.11
 HTTP/1.1 200 OK
-...
--------------------------------------------------------------------------------------------------------
-Q: kubectl config use-context cluster3
-
-Part I:
-Create a ClusterIP service .i.e. service-3421-svcn in the spectra-1267 ns which should expose the pods namely pod-23 and pod-21 with port set to 8080 and targetport to 80.
-
-Part II:
-Store the pod names and their ip addresses from the spectra-1267 ns at /root/pod_ips_cka05_svcn where the output is sorted by their IP's.
-
-Please ensure the format as shown below:
-POD_NAME        IP_ADDR
-pod-1           ip-1
-pod-3           ip-2
-pod-2           ip-3
 ...
 -------------------------------------------------------------------------------------------------------
 Q: A template to create a Kubernetes pod is stored at /root/red-probe-cka12-trb.yaml on the student-node. However, using this template as-is is resulting in an error.
@@ -1089,6 +1075,37 @@ spec:
   storageClassName: papaya-stc-cka09-str
   volumeMode: Filesystem
 status:
+  phase: Bound
+
+vi /tmp/papaya-pvc.yaml
+  apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"annotations":{},"name":"papaya-pvc-cka09-str","namespace":"default"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"50Mi"}},"storageClassName":"papaya-stc-cka09-str","volumeName":"papaya-pv-cka09-str"}}
+    pv.kubernetes.io/bind-completed: "yes"
+  creationTimestamp: "2024-03-19T19:20:41Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: papaya-pvc-cka09-str
+  namespace: default
+  resourceVersion: "10329"
+  uid: b3bc9283-8835-4733-89b0-8dcc2ee737b1
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 80Mi  <-- update here from 50Mi to 80Mi
+  storageClassName: papaya-stc-cka09-str
+  volumeMode: Filesystem
+  volumeName: papaya-pv-cka09-str
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
   phase: Bound
 ------------------------------------------------------------------------------------------------------------------------------------------
 Q: A pod called color-app-cka13-arch has been created in the default namespace. This pod logs can be accessed using kubectl logs -f color-app-cka13-arch command from the student-node. 
@@ -2171,3 +2188,24 @@ The web application listens on port 8080.
 Ans: kubectl config use-context cluster3
 kubectl create deployment  hr-web-app-cka08-svcn --image=kodekloud/webapp-color --replicas=2
 kubectl expose deployment hr-web-app-cka08-svcn --type=NodePort --port=8080 --name=hr-web-app-service-cka08-svcn --dry-run=client -o yaml > hr-web-app-service-cka08-svcn.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: We recently deployed a DaemonSet called logs-cka26-trb under kube-system namespace in cluster2 for collecting logs from all the cluster nodes including the controlplane node. 
+However, at this moment, the DaemonSet is not creating any pod on the controlplane node.
+Troubleshoot the issue and fix it to make sure the pods are getting created on all nodes including the controlplane node.
+
+Ans: kubectl config use-context cluster2
+
+kubectl --context2 cluster2 get ds logs-cka26-trb -n kube-system
+You will find that DESIRED CURRENT READY etc have value 2 which means there are two pods that have been 
+created. You can check the same by listing the PODs
+
+kubectl --context2 cluster2 get pod  -n kube-system
+kubectl --context2 cluster2 get pod <pod-name> -n kube-system -o wide
+Under NODE you will find the node name, so we can see that its not scheduled on the controlplane node which is because 
+it must be missing the reqiured tolerations. Let's edit the DaemonSet to fix the tolerations
+
+kubectl --context2 cluster2 edit ds logs-cka26-trb -n kube-system
+Under tolerations: add below given tolerations as well
+- key: node-role.kubernetes.io/control-plane
+  operator: Exists
+  effect: NoSchedule
