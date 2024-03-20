@@ -1,3 +1,4 @@
+https://killer.sh/attendee/907b8fef-317e-4fb9-9628-5565568d6532/content
 export dr='--dry-run=client' -o yaml
 k run pod --image=nginx $dr (to test, whethere the above $dr is working or not)
 export now='--grace-period=0' --force'
