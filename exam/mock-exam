@@ -2209,3 +2209,77 @@ Under tolerations: add below given tolerations as well
 - key: node-role.kubernetes.io/control-plane
   operator: Exists
   effect: NoSchedule
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: API Crash and solve using below methods
+Ans:
+cp /etc/kubernetes/manifests/kube-apiserver.yaml ~/kube-apiserver.yaml.ori
+k get pods -n kube-system
+vim /etc/kubernetes/manifests/kube-apiserver.yaml (try to look over to understand, if not below are the methods)
+watch crictl ps 
+cat /var/log/pods/kube-system_kube-apiserver-controlplane_a3a455d471f833137588e71658e739da/kube-apiserver/X.log
+2024-03-20T14:22:57.815470526Z stderr F Error: unknown flag: --this-is-very-wrong (This is the error)
+vim /etc/kubernetes/manifests/kube-apiserver.yaml
+undo the changes or remove flag
+cp ~/kube-apiserver.yaml.ori /etc/kubernetes/manifests/kube-apiserver.yaml
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: API Server Crash:
+Misconfigure ETCD connection
+Change the existing Apiserver manifest argument to: --etcd-servers=this-is-very-wrong .
+Check what the logs say, without using anything in /var .
+Fix the Apiserver again.
+Ans:
+cp /etc/kubernetes/manifests/kube-apiserver.yaml ~/kube-apiserver.yaml.ori
+
+/var/log/pods
+crictl logs
+
+syslogs:
+cat /var/log/syslog | grep apiserver
+journalctl | grep apiserver
+
+journalctl | grep apiserver
+>>> Could not process manifest file" err="/etc/kubernetes/manifests/kube-apiserver.yaml: couldn't parse as pod(yaml: mapping values are not allowed in this context), please check config file
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: There is existing Namespace applications .
+
+User smoke should be allowed to create and delete Pods, Deployments and StatefulSets in Namespace applications.
+User smoke should have view permissions (like the permissions of the default ClusterRole named view ) in all Namespaces but not in kube-system .
+Verify everything using kubectl auth can-i .
+Ans:
+k create -n applications role smoke --verb create,delete --resource pods,deployments,sts
+k create -n applications rolebinding smoke --role smoke --user smoke
+
+view permission in all Namespaces but not kube-system:
+k get ns
+NAME                 STATUS   AGE
+applications         Active   7m14s
+default              Active   16d
+kube-node-lease      Active   16d
+kube-public          Active   16d
+kube-system          Active   16d
+local-path-storage   Active   16d
+k -n applications create rolebinding smoke-view --clusterrole view --user smoke
+k -n default create rolebinding smoke-view --clusterrole view --user smoke
+k -n kube-node-lease create rolebinding smoke-view --clusterrole view --user smoke
+k -n kube-public create rolebinding smoke-view --clusterrole view --user smoke
+k -n local-path-storage create rolebinding smoke-view --clusterrole view --user smoke
+
+Verify:
+# applications
+k auth can-i create deployments --as smoke -n applications # YES
+k auth can-i delete deployments --as smoke -n applications # YES
+k auth can-i delete pods --as smoke -n applications # YES
+k auth can-i delete sts --as smoke -n applications # YES
+k auth can-i delete secrets --as smoke -n applications # NO
+k auth can-i list deployments --as smoke -n applications # YES
+k auth can-i list secrets --as smoke -n applications # NO
+k auth can-i get secrets --as smoke -n applications # NO
+
+# view in all namespaces but not kube-system
+k auth can-i list pods --as smoke -n default # YES
+k auth can-i list pods --as smoke -n applications # YES
+k auth can-i list pods --as smoke -n kube-public # YES
+k auth can-i list pods --as smoke -n kube-node-lease # YES
+k auth can-i list pods --as smoke -n kube-system # NO
+------------------------------------------------------------------------------------------------------------------------------------------
+Q: 
