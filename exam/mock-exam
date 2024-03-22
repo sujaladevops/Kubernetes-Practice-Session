@@ -2281,5 +2281,4 @@ k auth can-i list pods --as smoke -n applications # YES
 k auth can-i list pods --as smoke -n kube-public # YES
 k auth can-i list pods --as smoke -n kube-node-lease # YES
 k auth can-i list pods --as smoke -n kube-system # NO
-------------------------------------------------------------------------------------------------------------------------------------------
-Q: 
+-----------------------------------------------------------------------------------------------------------------------------------------

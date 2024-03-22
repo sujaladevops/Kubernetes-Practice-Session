@@ -330,7 +330,8 @@ mv ./kube-scheduler.yaml ../ or rename it.
 k run manual-schedule --image=httpd:2.4-alpine
 k get pods manual-schedule <-- Pending because there's no kube-scheduler on the location to schedule
 
-k run manual-schedule --image=httpd:2.4-alpine $dr > 9.yaml
+k run manual-schedule --image=httpd:2.4-alpine 
+k get pod manual-schedule $dr > 9.yaml
 vi 9.yaml
 under spec:
         nodeName: cluster2-controlplane1
@@ -723,6 +724,8 @@ Now we see if this caused events again and we write those into the second file:
 k8s@terminal:~ sh /opt/course/15/cluster_events.sh
 OR
 k8s@terminal:~ kubectl get events -A --sort-by=.metadata.creationTimestamp
+kubectl delete pod -n kube-system -l k8s-app=kube-proxy --field-selector spec.nodeName=cluster2-node1 >> /opt/course/15/pod_kill.log
+ssh cluster2-node1 "sudo crictl ps -q --name=k8s_kube-proxy_kube-proxy -a | xargs sudo crictl stop && sudo crictl ps -q --name=k8s_kube-proxy_kube-proxy -a | xargs sudo crictl rm" >> /opt/course/15/container_kill.log
 
 copy the logs 
 # /opt/course/15/container_kill.log
